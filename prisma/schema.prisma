@@ -1,0 +1,124 @@
+// Prisma schema for Seneto Diplomas system
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  superadmin
+  admin
+}
+
+model User {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  password_hash  String
+  role           UserRole     @default(admin)
+  created_at     DateTime     @default(now())
+  last_login_at  DateTime?
+
+  generations    Generation[]
+  audit_logs     AuditLog[]
+
+  @@map("users")
+}
+
+model Template {
+  id               String       @id @default(cuid())
+  name             String
+  file_path        String?
+  image_width_px   Int?
+  image_height_px  Int?
+  field_zones      Json?
+  is_active        Boolean      @default(true)
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
+  generations      Generation[]
+
+  @@map("templates")
+}
+
+model Generation {
+  id               String       @id @default(cuid())
+  name             String
+  template_id      String
+  status           String       @default("draft")
+  folio_prefix     String       @default("SEN")
+  folio_year       Int
+  folio_counter    Int          @default(1)
+  total_count      Int          @default(0)
+  processed_count  Int          @default(0)
+  error_count      Int          @default(0)
+  csv_path         String?
+  photos_zip_path  String?
+  zip_path         String?
+  created_by       String
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
+  template         Template     @relation(fields: [template_id], references: [id])
+  creator          User         @relation(fields: [created_by], references: [id])
+  certificates     Certificate[]
+  errors           GenerationError[]
+
+  @@map("generations")
+}
+
+model Certificate {
+  id                  String       @id @default(cuid())
+  folio               String       @unique
+  verification_token  String       @unique @default(uuid())
+  generation_id       String
+  student_name        String
+  email               String?
+  program             String?
+  issued_date         DateTime?
+  status              String       @default("pending")
+  photo_path          String?
+  diploma_pdf_path    String?
+  diploma_png_path    String?
+  error_message       String?
+  created_at          DateTime     @default(now())
+  updated_at          DateTime     @updatedAt
+  revoked_at          DateTime?
+  revocation_reason   String?
+
+  generation          Generation   @relation(fields: [generation_id], references: [id])
+
+  @@map("certificates")
+}
+
+model GenerationError {
+  id             String       @id @default(cuid())
+  generation_id  String
+  student_name   String?
+  row_number     Int?
+  error_type     String
+  error_detail   String?
+  created_at     DateTime     @default(now())
+
+  generation     Generation   @relation(fields: [generation_id], references: [id])
+
+  @@map("generation_errors")
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  user_id     String?
+  action      String
+  target_id   String?
+  target_type String?
+  detail      Json?
+  ip          String?
+  created_at  DateTime  @default(now())
+
+  user        User?     @relation(fields: [user_id], references: [id])
+
+  @@map("audit_logs")
+}
