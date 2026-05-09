@@ -7,6 +7,8 @@ import { assertOwnership } from '@/lib/api/ownership'
 import { handleApiError, Errors } from '@/lib/api/errors'
 import { logAction } from '@/lib/api/audit'
 
+import { runGenerationEngine } from '@/lib/diploma/engine'
+
 // Safe response select — no internal storage paths exposed to clients
 const GENERATION_SELECT = {
   id: true,
@@ -58,49 +60,29 @@ export async function POST(
     })
     if (!generation) throw Errors.NOT_FOUND('Generación')
 
-    // Sprint 1 stub: synchronous generation simulation.
-    // Real async PDF/PNG generation is implemented in Sprint 1b.
-    const result = await prisma.$transaction(async (tx) => {
-      // Atomic check + transition — prevents concurrent double-start (BLOQ-B3-002)
-      // Only succeeds if status is currently 'ready'; second concurrent request gets count=0
-      const transitioned = await tx.generation.updateMany({
-        where: { id: params.id, status: 'ready' },
-        data: { status: 'processing' },
-      })
-
-      if (transitioned.count === 0) {
-        const current = await tx.generation.findUnique({
-          where: { id: params.id },
-          select: { status: true },
-        })
-        throw Errors.CONFLICT(
-          `La generación está en estado "${current?.status ?? 'desconocido'}" y no puede iniciarse. Se requiere estado "ready".`
-        )
-      }
-
-      // Stub: mark all pending certificates as active (simulates successful render)
-      const updated = await tx.certificate.updateMany({
-        where: { generation_id: params.id, status: 'pending' },
-        data: { status: 'active' },
-      })
-
-      // Transition to completed with updated counters
-      return tx.generation.update({
-        where: { id: params.id },
-        data: {
-          status: 'completed',
-          processed_count: updated.count,
-        },
-        select: GENERATION_SELECT,
-      })
+    // Atomic check + transition — prevents concurrent double-start (BLOQ-B3-002)
+    // Only succeeds if status is currently 'ready'; second concurrent request gets count=0
+    const transitioned = await prisma.generation.updateMany({
+      where: { id: params.id, status: 'ready' },
+      data: { status: 'processing' },
     })
+
+    if (transitioned.count === 0) {
+      const current = await prisma.generation.findUnique({
+        where: { id: params.id },
+        select: { status: true },
+      })
+      throw Errors.CONFLICT(
+        `La generación está en estado "${current?.status ?? 'desconocido'}" y no puede iniciarse. Se requiere estado "ready".`
+      )
+    }
 
     const ip =
       req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
       req.headers.get('x-real-ip') ??
       undefined
 
-    // Audit log outside transaction — best effort, never blocks the main flow
+    // Audit log — best effort, never blocks the main flow
     await logAction({
       userId: session.user.id,
       action: 'generation.started',
@@ -111,11 +93,26 @@ export async function POST(
         folio_prefix: generation.folio_prefix,
         folio_year: generation.folio_year,
         total_count: generation.total_count,
-        stub: true,
+        stub: false,
       },
     })
 
-    return NextResponse.json({ generation: result }, { status: 200 })
+    // S3A-005: Fire-and-forget generation engine
+    runGenerationEngine(params.id).catch(async (err) => {
+      console.error(`Fatal Engine Error [${params.id}]:`, err)
+      // Fallback in case engine fails before its internal try-catch 
+      // or if internal try-catch fails to update status.
+      try {
+        await prisma.generation.update({
+          where: { id: params.id },
+          data: { status: 'failed' }
+        })
+      } catch (dbErr) {
+        console.error(`Failed to set generation ${params.id} to failed state:`, dbErr)
+      }
+    })
+
+    return NextResponse.json({ status: 'processing' }, { status: 202 })
   } catch (error) {
     return handleApiError(error)
   }
