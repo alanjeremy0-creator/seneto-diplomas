@@ -97,3 +97,52 @@ export interface VerifyResponse {
   institution: string
   message: string
 }
+
+// ── FE-012 / FE-013 safe view-layer types ────────────────────────────────────
+// These types match exactly what GET /api/certificates and
+// GET /api/certificates/[folio] return after stripping internal fields.
+// NEVER add: verification_token, photo_path, diploma_pdf_path,
+//            diploma_png_path, email, or raw storage paths.
+
+export interface CertificateGenerationRef {
+  id: string
+  name: string
+  folio_prefix: string
+  folio_year: number
+}
+
+/** Shape returned by GET /api/certificates (list item). */
+export interface CertificateListItem {
+  /** Internal DB id — never render in UI */
+  id: string
+  folio: string
+  student_name: string
+  program?: string | null
+  issued_date?: string | Date | null
+  status: CertificateStatus
+  has_photo: boolean
+  created_at: string | Date
+  updated_at: string | Date
+  generation: CertificateGenerationRef
+}
+
+/** Shape returned by GET /api/certificates/[folio] (detail). */
+export interface CertificateDetailItem extends CertificateListItem {
+  revoked_at?: string | Date | null
+  revocation_reason?: string | null
+  // generation_id intentionally omitted — use generation.id if needed
+}
+
+export interface CertificateListResponse {
+  certificates: CertificateListItem[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    pages: number
+  }
+}
+
+export interface CertificateDetailResponse {
+  certificate: CertificateDetailItem
+}
