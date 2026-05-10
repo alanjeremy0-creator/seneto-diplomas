@@ -3,12 +3,14 @@
  * Run with: npx tsx scripts/smoke-engine.ts
  */
 
+import 'dotenv/config'
+
 if (process.env.NODE_ENV === 'production') {
   throw new Error('Refusing to run in production')
 }
 
 // Mock base URL for testing
-process.env.PUBLIC_VERIFY_BASE_URL = 'http://localhost:3000'
+process.env.PUBLIC_VERIFY_BASE_URL = process.env.PUBLIC_VERIFY_BASE_URL ?? 'http://localhost:3000'
 
 import { prisma } from '../src/lib/db'
 import { storage } from '../src/lib/storage/adapter'
