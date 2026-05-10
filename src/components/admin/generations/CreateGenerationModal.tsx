@@ -11,6 +11,7 @@ interface Props {
 export function CreateGenerationModal({ isOpen, onClose }: Props) {
   const router = useRouter()
   const [name, setName] = useState('')
+  const [prefix, setPrefix] = useState('SEN')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -22,6 +23,7 @@ export function CreateGenerationModal({ isOpen, onClose }: Props) {
       return () => clearTimeout(t)
     } else {
       setName('')
+      setPrefix('SEN')
       setError('')
     }
   }, [isOpen])
@@ -51,7 +53,7 @@ export function CreateGenerationModal({ isOpen, onClose }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({ name: trimmed, folio_prefix: prefix.trim() || 'SEN' }),
       })
       data = await res.json()
       if (!res.ok) {
@@ -111,6 +113,25 @@ export function CreateGenerationModal({ isOpen, onClose }: Props) {
               placeholder="Ej. Generación Primavera 2026"
               className="mt-1.5 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:opacity-50"
             />
+          </div>
+
+          <div>
+            <label htmlFor="gen-prefix" className="block text-sm font-medium text-gray-700">
+              Prefijo de folio
+            </label>
+            <input
+              id="gen-prefix"
+              type="text"
+              maxLength={10}
+              value={prefix}
+              onChange={(e) => setPrefix(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+              disabled={loading}
+              placeholder="SEN"
+              className="mt-1.5 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:opacity-50"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Ejemplo: SEN, DEMO o TEST. Se usará para folios como {(prefix.trim() || 'SEN')}-2026-0001.
+            </p>
           </div>
 
           <div className="flex justify-end gap-3 pt-1">

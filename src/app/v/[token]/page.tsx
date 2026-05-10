@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import { prisma } from '@/lib/db'
 import { VerificationCard } from '@/components/verify/VerificationCard'
 import { VerificationError } from '@/components/verify/VerificationError'
@@ -20,40 +21,78 @@ export const metadata: Metadata = {
 const UUID_V4_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-// ── Page shell (shared across all states) ────────────────────────────────────
+// ── Page shell ────────────────────────────────────────────────────────────────
 
-function PageShell({ token, children }: { token: string; children: React.ReactNode }) {
+function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-[#f5f5f5]">
-      <header className="flex items-center justify-center px-4 py-6">
-        {/* Brand mark — PNG assets not available in MVP; using logotype text */}
-        <div className="text-center">
-          <span
-            className="text-2xl font-bold tracking-widest text-[#1a1a1a]"
-            aria-label="Seneto"
-          >
-            SENETO
-          </span>
+    <div className="relative flex min-h-screen flex-col bg-[#f5f5f5]">
+      {/* Warm red blob — top-right fixed, very subtle */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed z-0"
+        style={{
+          inset: '-10% -10% auto auto',
+          width: '60vw',
+          height: '60vw',
+          maxWidth: 700,
+          maxHeight: 700,
+          background: 'radial-gradient(circle, rgba(201,53,77,.07) 0%, transparent 60%)',
+          filter: 'blur(40px)',
+        }}
+      />
+
+      {/* Topbar */}
+      <header className="relative z-10 flex items-center border-b border-[#ececec] bg-white/70 px-5 py-4 backdrop-blur-md sm:px-8 sm:py-5">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/assets/brand/SENETO_logo.png"
+            alt="SENETO"
+            width={72}
+            height={72}
+            className="h-9 w-auto"
+            priority
+          />
+          <span className="h-5 w-px bg-[#e5e7eb]" aria-hidden="true" />
+          <Image
+            src="/assets/brand/SENETO_ensenanza_logo.png"
+            alt="Seneto enseñanza"
+            width={4424}
+            height={1189}
+            className="h-6 w-auto mix-blend-multiply"
+          />
         </div>
       </header>
 
-      <main className="flex-1 px-4 pb-10">
-        <div className="mx-auto w-full max-w-sm">{children}</div>
+      {/* Main */}
+      <main className="relative z-10 flex flex-1 items-start justify-center px-4 py-6 sm:px-6 sm:py-14">
+        <div className="flex w-full max-w-[480px] flex-col gap-4">{children}</div>
       </main>
 
-      <footer className="px-4 py-6 text-center">
-        <p className="text-xs text-gray-500">
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-[#ececec] px-6 pb-10 pt-8 text-center text-[12px] text-[#6b7280]">
+        <div className="mb-3 flex justify-center">
+          <Image
+            src="/assets/brand/SENETO_logo.png"
+            alt="SENETO"
+            width={72}
+            height={72}
+            className="h-10 w-auto opacity-60 mix-blend-multiply"
+          />
+        </div>
+        <div className="flex justify-center gap-4">
           <a
             href="https://corporativoseneto.com"
             rel="noopener noreferrer"
             target="_blank"
-            className="inline-flex min-h-[44px] items-center px-1 underline hover:text-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a8ab5]"
+            className="text-[#4b5563] no-underline hover:text-[#c9354d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a8ab5]"
           >
             seneto.com
           </a>
-          {/* DEC-005: privacy URL pending — rendered as plain text until URL is confirmed */}
-          <span className="mx-1">·</span>
-          <span className="px-1 text-gray-400">Privacidad</span>
+          <span className="text-[#9ca3af]">Privacidad</span>
+        </div>
+        <p className="mx-auto mt-2 max-w-[480px] leading-relaxed">
+          Esta página confirma la autenticidad de credenciales emitidas por Seneto. No expone datos
+          personales sensibles. Para reportar uso indebido escribe a verificacion@seneto.com.
         </p>
       </footer>
     </div>
@@ -71,7 +110,7 @@ export default async function VerifyPage({
 
   if (!UUID_V4_RE.test(token)) {
     return (
-      <PageShell token={token}>
+      <PageShell>
         <VerificationError kind="invalid" token={token} />
       </PageShell>
     )
@@ -99,7 +138,7 @@ export default async function VerifyPage({
     cert = raw ? { ...raw, status: raw.status as CertificateStatus } : null
   } catch {
     return (
-      <PageShell token={token}>
+      <PageShell>
         <VerificationError kind="server-error" token={token} />
       </PageShell>
     )
@@ -107,14 +146,14 @@ export default async function VerifyPage({
 
   if (!cert) {
     return (
-      <PageShell token={token}>
+      <PageShell>
         <VerificationError kind="not-found" token={token} />
       </PageShell>
     )
   }
 
   return (
-    <PageShell token={token}>
+    <PageShell>
       <VerificationCard
         status={cert.status}
         folio={cert.folio}

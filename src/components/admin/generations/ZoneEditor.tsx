@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { FieldZones, FieldZone, QRZone } from '@/types/index'
 
 type ZoneKey = keyof FieldZones
+type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se'
 
 const ZONE_META: Record<ZoneKey, { label: string; required: boolean; border: string; bg: string; text: string; ring: string }> = {
   name:    { label: 'Nombre',    required: true,  border: 'border-blue-500',   bg: 'bg-blue-500/25',   text: 'text-blue-700',   ring: 'ring-blue-400' },
@@ -17,12 +18,23 @@ const ZONE_META: Record<ZoneKey, { label: string; required: boolean; border: str
 
 const ZONE_ORDER: ZoneKey[] = ['name', 'photo', 'qr', 'program', 'folio', 'date']
 
+const HANDLE_CURSORS: Record<ResizeHandle, string> = {
+  nw: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', se: 'nwse-resize',
+}
+
+const HANDLE_POS: Record<ResizeHandle, React.CSSProperties> = {
+  nw: { top: -5,  left: -5  },
+  ne: { top: -5,  right: -5 },
+  sw: { bottom: -5, left: -5  },
+  se: { bottom: -5, right: -5 },
+}
+
 interface ZoneState {
   enabled: boolean
   x: number
   y: number
-  width: number  // QR: also height (kept square)
-  height: number // QR: mirrors width
+  width: number
+  height: number
 }
 
 interface DragState {
@@ -32,6 +44,18 @@ interface DragState {
   originClientY: number
   originZoneX: number
   originZoneY: number
+}
+
+interface ResizeState {
+  key: ZoneKey
+  handle: ResizeHandle
+  pointerId: number
+  originClientX: number
+  originClientY: number
+  originZoneX: number
+  originZoneY: number
+  originZoneW: number
+  originZoneH: number
 }
 
 function clamp(v: number, lo: number, hi: number) {
@@ -129,12 +153,13 @@ export function ZoneEditor({ generationId, disabled = false, hasImage, imageWidt
   )
   const [selected, setSelected] = useState<ZoneKey | null>(null)
   const [draggingKey, setDraggingKey] = useState<ZoneKey | null>(null)
+  const [resizingKey, setResizingKey] = useState<ZoneKey | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
 
-  // Drag state in a ref to avoid re-renders during pointer move
   const activeDrag = useRef<DragState | null>(null)
+  const activeResize = useRef<ResizeState | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   if (disabled) {
@@ -154,13 +179,12 @@ export function ZoneEditor({ generationId, disabled = false, hasImage, imageWidt
 
   function updateField(key: ZoneKey, field: 'x' | 'y' | 'width' | 'height', raw: number) {
     const patch: Partial<ZoneState> = { [field]: raw }
-    // QR stays square: mirror width ↔ height
     if (key === 'qr' && field === 'width')  patch.height = raw
     if (key === 'qr' && field === 'height') patch.width  = raw
     updateZone(key, patch)
   }
 
-  // ── Pointer / drag handlers ──────────────────────────────────────────────
+  // ── Drag (move) handlers ─────────────────────────────────────────────────
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>, key: ZoneKey) {
     if (e.button !== 0) return
@@ -191,7 +215,6 @@ export function ZoneEditor({ generationId, disabled = false, hasImage, imageWidt
     const dx = Math.round((e.clientX - drag.originClientX) / scale)
     const dy = Math.round((e.clientY - drag.originClientY) / scale)
 
-    // Skip tiny sub-pixel noise
     if (dx === 0 && dy === 0) return
 
     const z = zones[drag.key]
@@ -209,7 +232,6 @@ export function ZoneEditor({ generationId, disabled = false, hasImage, imageWidt
     const drag = activeDrag.current
     if (!drag || drag.pointerId !== e.pointerId) return
 
-    // If the pointer barely moved, treat as a click → toggle selection
     const movedPx = Math.abs(e.clientX - drag.originClientX) + Math.abs(e.clientY - drag.originClientY)
     if (movedPx <= 4) {
       setSelected((prev) => (prev === key ? null : key))
@@ -221,7 +243,92 @@ export function ZoneEditor({ generationId, disabled = false, hasImage, imageWidt
 
   function onPointerCancel() {
     activeDrag.current = null
+    activeResize.current = null
     setDraggingKey(null)
+    setResizingKey(null)
+  }
+
+  // ── Resize handlers ──────────────────────────────────────────────────────
+
+  function onResizePointerDown(e: React.PointerEvent<HTMLDivElement>, key: ZoneKey, handle: ResizeHandle) {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const z = zones[key]
+    activeResize.current = {
+      key, handle, pointerId: e.pointerId,
+      originClientX: e.clientX, originClientY: e.clientY,
+      originZoneX: z.x, originZoneY: z.y, originZoneW: z.width, originZoneH: z.height,
+    }
+    setResizingKey(key)
+    setSelected(key)
+  }
+
+  function onResizePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const r = activeResize.current
+    if (!r || r.pointerId !== e.pointerId) return
+
+    const container = containerRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    const scale = rect.width / imgW
+
+    const dx = Math.round((e.clientX - r.originClientX) / scale)
+    const dy = Math.round((e.clientY - r.originClientY) / scale)
+    if (dx === 0 && dy === 0) return
+
+    const isQr = r.key === 'qr'
+    const minSize = (r.key === 'photo' || r.key === 'qr') ? 40 : 20
+
+    // Right and bottom edges stay fixed for NW/NE/SW handles respectively
+    const rx = r.originZoneX + r.originZoneW  // fixed right edge for NW, SW
+    const by = r.originZoneY + r.originZoneH  // fixed bottom edge for NW, NE
+
+    let nx = r.originZoneX
+    let ny = r.originZoneY
+    let nw = r.originZoneW
+    let nh = r.originZoneH
+
+    switch (r.handle) {
+      case 'se': {
+        nw = clamp(r.originZoneW + dx, minSize, imgW - r.originZoneX)
+        nh = isQr ? nw : clamp(r.originZoneH + dy, minSize, imgH - r.originZoneY)
+        break
+      }
+      case 'sw': {
+        nw = clamp(r.originZoneW - dx, minSize, rx)
+        nx = rx - nw
+        nh = isQr ? nw : clamp(r.originZoneH + dy, minSize, imgH - r.originZoneY)
+        if (isQr) { nh = nw; nx = rx - nw }
+        break
+      }
+      case 'ne': {
+        nw = clamp(r.originZoneW + dx, minSize, imgW - r.originZoneX)
+        nh = isQr ? nw : clamp(r.originZoneH - dy, minSize, by)
+        ny = isQr ? by - nw : by - nh
+        break
+      }
+      case 'nw': {
+        nw = clamp(r.originZoneW - dx, minSize, rx)
+        nx = rx - nw
+        nh = isQr ? nw : clamp(r.originZoneH - dy, minSize, by)
+        ny = isQr ? by - nw : by - nh
+        break
+      }
+    }
+
+    setZones((prev) => ({
+      ...prev,
+      [r.key]: { ...prev[r.key], x: nx, y: ny, width: nw, height: nh },
+    }))
+    setSaved(false)
+  }
+
+  function onResizePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!activeResize.current || activeResize.current.pointerId !== e.pointerId) return
+    activeResize.current = null
+    setResizingKey(null)
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -260,7 +367,6 @@ export function ZoneEditor({ generationId, disabled = false, hasImage, imageWidt
 
   return (
     <div className="space-y-5">
-      {/* Image canvas with draggable zone overlays */}
       {hasImage ? (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
           <div
@@ -281,6 +387,7 @@ export function ZoneEditor({ generationId, disabled = false, hasImage, imageWidt
               const meta = ZONE_META[key]
               const isSelected = selected === key
               const isDragging = draggingKey === key
+              const isResizing = resizingKey === key
 
               return (
                 <div
@@ -291,7 +398,7 @@ export function ZoneEditor({ generationId, disabled = false, hasImage, imageWidt
                   onPointerUp={(e) => onPointerUp(e, key)}
                   onPointerCancel={onPointerCancel}
                   className={`absolute border-2 transition-shadow ${meta.border} ${meta.bg} ${
-                    isDragging
+                    isDragging || isResizing
                       ? 'cursor-grabbing opacity-90 shadow-lg'
                       : 'cursor-grab opacity-80 hover:opacity-95'
                   } ${isSelected ? `ring-2 ring-offset-1 ${meta.ring}` : ''}`}
@@ -305,12 +412,31 @@ export function ZoneEditor({ generationId, disabled = false, hasImage, imageWidt
                   <span className={`pointer-events-none absolute left-1 top-0.5 text-[10px] font-bold leading-none ${meta.text}`}>
                     {meta.label}
                   </span>
+
+                  {/* Resize handles — visible when zone is selected */}
+                  {isSelected && (['nw', 'ne', 'sw', 'se'] as ResizeHandle[]).map((handle) => (
+                    <div
+                      key={handle}
+                      onPointerDown={(e) => onResizePointerDown(e, key, handle)}
+                      onPointerMove={onResizePointerMove}
+                      onPointerUp={onResizePointerUp}
+                      onPointerCancel={() => { activeResize.current = null; setResizingKey(null) }}
+                      style={{
+                        position: 'absolute',
+                        width: 10,
+                        height: 10,
+                        cursor: HANDLE_CURSORS[handle],
+                        ...HANDLE_POS[handle],
+                      }}
+                      className="rounded-sm border-2 border-white bg-blue-500 shadow-sm"
+                    />
+                  ))}
                 </div>
               )
             })}
           </div>
           <p className="px-3 py-1.5 text-[11px] text-gray-400">
-            Arrastra una zona para reposicionarla. Usa los inputs para ajustar dimensiones.
+            Arrastra una zona para moverla · Arrastra una esquina azul para redimensionar · Usa los inputs para valores exactos.
           </p>
         </div>
       ) : (

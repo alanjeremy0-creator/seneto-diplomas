@@ -47,3 +47,6 @@ logfile
 
 # Claude Code local config
 .claude/
+
+# AI Agent local configuration & skills
+.agent/

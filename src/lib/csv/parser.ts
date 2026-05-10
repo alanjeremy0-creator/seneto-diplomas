@@ -56,6 +56,36 @@ function splitCsvLine(line: string): string[] {
   return values
 }
 
+// Accepts YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, DD/MM/YY, DD-MM-YY.
+// Interprets ambiguous 2-part separators as DD/MM order (never MM/DD).
+// Returns normalized YYYY-MM-DD string, or null if invalid.
+function parseFlexibleDate(raw: string): string | null {
+  let year: number, month: number, day: number
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (isoMatch) {
+    year  = parseInt(isoMatch[1], 10)
+    month = parseInt(isoMatch[2], 10)
+    day   = parseInt(isoMatch[3], 10)
+  } else {
+    const dmyMatch = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/)
+    if (!dmyMatch) return null
+    day   = parseInt(dmyMatch[1], 10)
+    month = parseInt(dmyMatch[2], 10)
+    const yr = parseInt(dmyMatch[3], 10)
+    year = dmyMatch[3].length === 2
+      ? (yr <= 69 ? 2000 + yr : 1900 + yr)
+      : yr
+  }
+
+  if (month < 1 || month > 12) return null
+  if (day   < 1) return null
+  // new Date(year, month, 0) gives the last day of month
+  if (day > new Date(year, month, 0).getDate()) return null
+
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
 export function parseCsv(csvText: string): CsvParseResult {
   const lines = csvText.split(/\r?\n/).filter((l) => l.trim() !== '')
 
@@ -90,6 +120,9 @@ export function parseCsv(csvText: string): CsvParseResult {
     const rowNumber = i + 1
     const values = splitCsvLine(lines[i])
 
+    // Skip rows where every field is empty (e.g. trailing ",,")
+    if (values.every((v) => v.trim() === '')) continue
+
     const student_name = nameIdx !== null ? (values[nameIdx] ?? '').trim() : ''
 
     if (!student_name) {
@@ -123,15 +156,19 @@ export function parseCsv(csvText: string): CsvParseResult {
 
     const issued_date_raw =
       issuedDateIdx !== null ? (values[issuedDateIdx] ?? '').trim() : ''
-    const issued_date = issued_date_raw || undefined
 
-    if (issued_date && !/^\d{4}-\d{2}-\d{2}$/.test(issued_date)) {
-      errors.push({
-        row_number: rowNumber,
-        student_name,
-        error_detail: `issued_date inválida: "${issued_date}" (se espera YYYY-MM-DD)`,
-      })
-      continue
+    let issued_date: string | undefined
+    if (issued_date_raw) {
+      const parsed = parseFlexibleDate(issued_date_raw)
+      if (!parsed) {
+        errors.push({
+          row_number: rowNumber,
+          student_name,
+          error_detail: `issued_date inválida: "${issued_date_raw}". Usa una fecha válida como 2026-06-10 o 10/06/2026.`,
+        })
+        continue
+      }
+      issued_date = parsed
     }
 
     const program = programIdx !== null

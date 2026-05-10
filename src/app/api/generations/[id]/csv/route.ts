@@ -91,7 +91,25 @@ export async function POST(
 
     // Build certificate data BEFORE the transaction so folio assignments are
     // deterministic even if the transaction is retried internally.
+    //
+    // Skip folio numbers already occupied by other generations sharing the same
+    // prefix+year. This prevents P2002 conflicts without requiring DB cleanup.
+    const folioPattern = `${generation.folio_prefix}-${generation.folio_year}-`
+    const lastConflicting = await prisma.certificate.findFirst({
+      where: {
+        folio: { startsWith: folioPattern },
+        NOT: { generation_id: params.id },
+      },
+      orderBy: { folio: 'desc' },
+      select: { folio: true },
+    })
     let folioCounter = generation.folio_counter
+    if (lastConflicting) {
+      const existingMax = parseInt(lastConflicting.folio.slice(folioPattern.length), 10)
+      if (!isNaN(existingMax) && existingMax >= folioCounter) {
+        folioCounter = existingMax + 1
+      }
+    }
     const certificateData = rows.map(({ data }) => {
       const folio =
         data.folio_override ??
@@ -160,18 +178,17 @@ export async function POST(
     )
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const target = (error.meta?.target as string[] | undefined) ?? []
-      if (target.includes('folio')) {
-        return NextResponse.json(
-          {
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: 'Uno o más folios ya están en uso en otra generación',
-            },
+      // Prisma 7 + adapter-pg does not populate meta.target; any P2002 here is a
+      // folio conflict since verification_token is auto-generated (no realistic collision).
+      return NextResponse.json(
+        {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Uno o más folios ya están en uso en otra generación',
           },
-          { status: 400 }
-        )
-      }
+        },
+        { status: 400 }
+      )
     }
     return handleApiError(error)
   }

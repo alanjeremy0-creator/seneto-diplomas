@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { StudentName } from './StudentName'
 import type { CertificateStatus } from '@/types/index'
 
@@ -22,206 +23,229 @@ function formatDate(iso: string | null): string | null {
   }
 }
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
+const CARD_SHADOW = '0 1px 2px rgba(17,24,39,.04), 0 24px 48px -28px rgba(17,24,39,.18)'
 
-function ShieldCheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <polyline points="9 12 11 14 15 10" />
-    </svg>
-  )
+function getIcon3d(status: CertificateStatus): string {
+  switch (status) {
+    case 'active': return '/icons/diploma_valido_3d.png'
+    case 'revoked': return '/icons/diploma_revocado_3d.png'
+    case 'expired':
+    case 'pending':
+    default: return '/icons/diploma_invalido_3d.png'
+  }
 }
 
-function ShieldXIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <line x1="9" y1="9" x2="15" y2="15" />
-      <line x1="15" y1="9" x2="9" y2="15" />
-    </svg>
-  )
-}
+// ── Status banner config ──────────────────────────────────────────────────────
 
-function ClockIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  )
-}
+type BannerCfg = { bg: string; border: string; color: string; label: string; pulse: boolean }
 
-function PendingIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
-  )
-}
-
-// ── Badge config per status ───────────────────────────────────────────────────
-
-type BadgeConfig = {
-  bg: string
-  textColor: string
-  label: string
-  icon: React.ReactNode
-  borderColor: string
-}
-
-function getBadgeConfig(status: CertificateStatus): BadgeConfig {
+function getBanner(status: CertificateStatus): BannerCfg {
   switch (status) {
     case 'active':
       return {
-        bg: 'rgba(22, 163, 74, 0.10)',
-        textColor: '#14732c',
-        label: 'Diploma válido',
-        icon: <ShieldCheckIcon className="h-8 w-8" />,
-        borderColor: 'rgba(22, 163, 74, 0.20)',
+        bg: '#ecf7f0',
+        border: '#bfe3cc',
+        color: '#1f7a4d',
+        label: 'Diploma válido y vigente',
+        pulse: true,
       }
     case 'revoked':
       return {
-        bg: 'rgba(201, 53, 77, 0.10)',
-        textColor: '#b02e43',
-        label: 'Este diploma ha sido revocado',
-        icon: <ShieldXIcon className="h-8 w-8" />,
-        borderColor: 'rgba(201, 53, 77, 0.20)',
+        bg: '#fdecec',
+        border: '#f3c2c2',
+        color: '#b91c1c',
+        label: 'Diploma revocado por la institución',
+        pulse: false,
       }
     case 'expired':
       return {
-        bg: 'rgba(138, 109, 0, 0.10)',
-        textColor: '#755c00',
-        label: 'Este diploma ha expirado',
-        icon: <ClockIcon className="h-8 w-8" />,
-        borderColor: 'rgba(138, 109, 0, 0.18)',
+        bg: '#fbf4dc',
+        border: '#ead38a',
+        color: '#8a6d00',
+        label: 'Diploma vencido — requiere recertificación',
+        pulse: false,
       }
     case 'pending':
     default:
       return {
-        bg: 'rgba(138, 109, 0, 0.10)',
-        textColor: '#755c00',
+        bg: '#fbf4dc',
+        border: '#ead38a',
+        color: '#8a6d00',
         label: 'Diploma en proceso',
-        icon: <PendingIcon className="h-8 w-8" />,
-        borderColor: 'rgba(107, 114, 128, 0.20)',
+        pulse: false,
       }
   }
 }
 
-// ── Data row ─────────────────────────────────────────────────────────────────
+// ── Trust ribbon config ───────────────────────────────────────────────────────
 
-function DataRow({ label, value }: { label: string; value: string | null | undefined }) {
-  if (!value) return null
-  return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-widest text-gray-400">{label}</dt>
-      <dd className="mt-0.5 text-sm font-medium text-gray-800">{value}</dd>
-    </div>
-  )
+type TrustCfg = { icoColor: string; icoBg: string; strong: string; body: string }
+
+function getTrust(status: CertificateStatus): TrustCfg {
+  switch (status) {
+    case 'active':
+      return {
+        icoColor: '#1f7a4d',
+        icoBg: '#ecf7f0',
+        strong: 'Verificado en tiempo real.',
+        body: 'Este registro se consultó directamente en los sistemas de SENETO Nefrología. La información mostrada es pública y se actualiza al momento de cada escaneo.',
+      }
+    case 'revoked':
+      return {
+        icoColor: '#b91c1c',
+        icoBg: '#fdecec',
+        strong: 'Esta credencial no es válida.',
+        body: 'Seneto ha cancelado este diploma desde el panel administrativo. No debe aceptarse como prueba de capacitación.',
+      }
+    case 'expired':
+      return {
+        icoColor: '#8a6d00',
+        icoBg: '#fbf4dc',
+        strong: 'Vigencia expirada.',
+        body: 'La capacitación es real, pero su vigencia ha caducado conforme a la política de recertificación de Seneto.',
+      }
+    case 'pending':
+    default:
+      return {
+        icoColor: '#8a6d00',
+        icoBg: '#fbf4dc',
+        strong: 'En proceso.',
+        body: 'Este diploma está siendo procesado. Inténtalo de nuevo más tarde o contacta a Seneto.',
+      }
+  }
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function VerificationCard({ status, folio, studentName, program, issuedDate }: Props) {
-  const badge = getBadgeConfig(status)
+  const banner = getBanner(status)
+  const trust = getTrust(status)
+  const icon3d = getIcon3d(status)
   const formattedDate = formatDate(issuedDate)
 
   return (
-    <div
-      className="overflow-hidden rounded-2xl border bg-white shadow-md"
-      style={{ borderColor: badge.borderColor }}
-    >
-      {/* ── Status badge ─────────────────────────────────────────────────── */}
+    <>
+      {/* Status banner — pill above card */}
       <div
-        className="flex flex-col items-center gap-3 px-6 py-8 text-center"
-        style={{ background: badge.bg, color: badge.textColor }}
+        role="status"
+        aria-live="polite"
+        aria-label={`Estado del diploma: ${banner.label}`}
+        className="flex items-center gap-3 rounded-full border-[1.5px] px-[18px] py-3.5 text-[14px] font-semibold tracking-[.02em]"
+        style={{ background: banner.bg, borderColor: banner.border, color: banner.color }}
       >
-        <div aria-hidden="true">{badge.icon}</div>
-        <div
-          role="status"
-          aria-live="polite"
-          aria-label={`Estado del diploma: ${badge.label}`}
-          className="text-lg font-semibold leading-snug"
-        >
-          {badge.label}
-        </div>
+        <span className="relative flex h-2.5 w-2.5 flex-none" aria-hidden="true">
+          {banner.pulse && (
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
+          )}
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-current" />
+        </span>
+        <span>{banner.label}</span>
       </div>
 
-      {/* ── Certificate data ──────────────────────────────────────────────── */}
-      <div className="px-6 py-6">
-        {status === 'active' && (
-          <>
-            {/* Participant name — large and prominent */}
-            <div className="mb-5">
-              <p className="text-xs font-medium uppercase tracking-widest text-gray-400">
-                Participante
-              </p>
-              <p className="mt-1 text-xl font-semibold leading-snug text-gray-900">
-                <StudentName value={studentName} />
-              </p>
-              {program && (
-                <p className="mt-1 text-sm text-gray-500">{program}</p>
-              )}
+      {/* Credential card */}
+      <article
+        className="overflow-hidden rounded-[2rem] border border-[#ececec] bg-white"
+        style={{ boxShadow: CARD_SHADOW }}
+      >
+        {/* Header: eyebrow + title + 3D status icon + logos strip */}
+        <div className="border-b border-dashed border-[#ececec]">
+          <div className="flex items-start justify-between gap-4 px-[22px] pb-4 pt-7 sm:px-8">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[.16em] text-[#6b7280]">
+                Diploma · Seneto
+              </div>
+              <h1 className="mt-1.5 text-[13px] font-semibold leading-snug tracking-[-0.005em] text-[#1a1a1a]">
+                Diploma emitido por la institución
+              </h1>
             </div>
-            <hr className="border-gray-100" />
-            <dl className="mt-5 space-y-4">
-              {formattedDate && <DataRow label="Emitido el" value={formattedDate} />}
-              <DataRow label="Folio" value={folio} />
-              <DataRow label="Institución" value="Seneto" />
-            </dl>
-          </>
-        )}
+            <Image
+              src={icon3d}
+              alt=""
+              width={56}
+              height={56}
+              className="h-14 w-14 flex-none mix-blend-multiply"
+            />
+          </div>
+          <div className="px-[22px] pb-5 sm:px-8">
+            <Image
+              src="/assets/brand/logos_instituciones-01.png"
+              alt="Instituciones avaladoras"
+              width={1782}
+              height={444}
+              className="h-auto w-full"
+            />
+          </div>
+        </div>
 
-        {status === 'revoked' && (
-          <dl className="space-y-4">
-            <DataRow label="Folio" value={folio} />
-          </dl>
-        )}
+        {/* Body: participant + program + meta grid */}
+        <div className="flex flex-col gap-6 px-[22px] py-7 sm:px-8">
+          {/* Participant — hero */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#6b7280]">
+              Participante
+            </span>
+            <span className="mt-0.5 text-[24px] font-bold leading-[1.2] tracking-[-0.02em] text-[#1a1a1a] sm:text-[28px]">
+              <StudentName value={studentName} />
+            </span>
+          </div>
 
-        {status === 'expired' && (
-          <dl className="space-y-4">
-            <DataRow label="Folio" value={folio} />
-            {formattedDate && <DataRow label="Emitido el" value={formattedDate} />}
-          </dl>
-        )}
+          {/* Diplomado */}
+          {program && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#6b7280]">
+                Diplomado
+              </span>
+              <span className="mt-0.5 text-[17px] font-semibold leading-[1.4] text-[#1a1a1a]">
+                {program}
+              </span>
+            </div>
+          )}
 
-        {status === 'pending' && (
-          <dl className="space-y-4">
-            <DataRow label="Folio" value={folio} />
-          </dl>
-        )}
-      </div>
+          {/* Meta grid */}
+          <div className="grid grid-cols-1 gap-x-6 gap-y-[18px] border-t border-dashed border-[#ececec] pt-6 sm:grid-cols-2 sm:gap-y-5">
+            {formattedDate && (
+              <div className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#6b7280]">
+                  Emitido el
+                </span>
+                <span className="font-mono text-[13px] text-[#1a1a1a]">{formattedDate}</span>
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#6b7280]">
+                Folio
+              </span>
+              <span className="font-mono text-[13px] text-[#1a1a1a]">{folio}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#6b7280]">
+                Institución
+              </span>
+              <span className="text-[14px] text-[#1a1a1a]">Seneto · México</span>
+            </div>
+          </div>
+        </div>
 
-      {/* ── Institutional text ────────────────────────────────────────────── */}
-      <div className="border-t border-gray-100 px-6 py-5">
-        {status === 'active' && (
-          <p className="text-sm leading-relaxed text-gray-500">
-            Este diploma fue emitido por Seneto y se encuentra registrado como válido en nuestros sistemas.
+        {/* Trust ribbon */}
+        <div className="flex items-center gap-3.5 border-t border-white/20 bg-[#e54360] px-[22px] py-5 sm:px-8">
+          <div
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-white/20"
+            aria-hidden="true"
+          >
+            <Image
+              src={icon3d}
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-7"
+            />
+          </div>
+          <p className="m-0 text-[12.5px] leading-[1.5] text-white">
+            <strong className="font-semibold text-white">{trust.strong}</strong>{' '}
+            {trust.body}
           </p>
-        )}
-        {status === 'revoked' && (
-          <>
-            <p className="text-sm leading-relaxed text-gray-500">
-              Este diploma fue emitido por Seneto pero ha sido revocado.
-            </p>
-            <p className="mt-2 text-sm text-gray-500">
-              Para más información, contacta a Seneto.
-            </p>
-          </>
-        )}
-        {status === 'expired' && (
-          <p className="text-sm leading-relaxed text-gray-500">
-            Este diploma fue válido pero su vigencia ha expirado. Puedes contactar a Seneto para más información.
-          </p>
-        )}
-        {status === 'pending' && (
-          <p className="text-sm leading-relaxed text-gray-500">
-            Este diploma está siendo procesado. Por favor, inténtalo de nuevo más tarde o contacta a Seneto.
-          </p>
-        )}
-      </div>
-    </div>
+        </div>
+      </article>
+    </>
   )
 }

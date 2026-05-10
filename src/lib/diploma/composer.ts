@@ -1,17 +1,6 @@
-/**
- * PNG Composer module — Sprint 3A (S3A-002)
- *
- * Composites a diploma PNG by overlaying text (via SVG inline) and images
- * (QR code, optional photo) onto a base template.
- *
- * Architecture decisions:
- * - sharp + SVG inline (no canvas dependency)
- * - Sequential execution per diploma
- * - Preserves original template dimensions
- * - Validates input buffers to prevent crash loops
- */
-
 import sharp from 'sharp'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,16 +42,30 @@ export interface ComposeDiplomaParams {
   photoBuffer?: Buffer | null
 }
 
+// ── Font ──────────────────────────────────────────────────────────────────────
+
+// Cached at module level — read once, reused for every diploma in the batch
+let _ebGaramondBase64: string | null = null
+
+function getEbGaramondBase64(): string {
+  if (!_ebGaramondBase64) {
+    const fontPath = join(process.cwd(), 'src/lib/fonts/eb-garamond-500-italic.woff')
+    _ebGaramondBase64 = readFileSync(fontPath).toString('base64')
+  }
+  return _ebGaramondBase64
+}
+
 // ── Constants & Defaults ──────────────────────────────────────────────────────
 
-// PNG magic bytes: \x89 P N G \r \n \x1a \n
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
-/**
- * Standard A4 landscape proportions assumed if no template dimensions are available,
- * though normally the template dictates the size.
- * These are base default coordinates for a ~2000px wide template.
- */
+// Calibrated for EB Garamond 500 italic Latin characters
+const AVG_CHAR_WIDTH_RATIO = 0.52
+const LINE_HEIGHT_RATIO = 1.3
+
+// Margin applied so text doesn't touch zone edges
+const ZONE_FILL_FACTOR = 0.92
+
 export const DEFAULT_ZONES: {
   studentName: TextZone
   program: TextZone
@@ -71,27 +74,21 @@ export const DEFAULT_ZONES: {
   qr: ImageZone
   photo: ImageZone
 } = {
-  studentName: { x: 200, y: 500, width: 1600, height: 100, fontSize: 72, color: '#000000', fontFamily: 'sans-serif', align: 'center' },
-  program: { x: 200, y: 700, width: 1600, height: 80, fontSize: 48, color: '#333333', fontFamily: 'sans-serif', align: 'center' },
-  issuedDate: { x: 200, y: 900, width: 1600, height: 50, fontSize: 36, color: '#666666', fontFamily: 'sans-serif', align: 'center' },
-  folio: { x: 200, y: 1300, width: 1600, height: 40, fontSize: 24, color: '#999999', fontFamily: 'sans-serif', align: 'center' },
-  qr: { x: 1600, y: 1000, width: 250, height: 250 },
-  photo: { x: 150, y: 1000, width: 250, height: 250 }
+  studentName: { x: 200, y: 500, width: 1600, height: 200, fontSize: 72, color: '#000000', fontFamily: 'sans-serif', align: 'center' },
+  program:     { x: 200, y: 700, width: 1600, height: 80,  fontSize: 48, color: '#333333', fontFamily: 'sans-serif', align: 'center' },
+  issuedDate:  { x: 200, y: 900, width: 1600, height: 50,  fontSize: 36, color: '#666666', fontFamily: 'sans-serif', align: 'center' },
+  folio:       { x: 200, y: 1300, width: 1600, height: 40, fontSize: 24, color: '#999999', fontFamily: 'sans-serif', align: 'center' },
+  qr:          { x: 1600, y: 1000, width: 250, height: 250 },
+  photo:       { x: 150,  y: 1000, width: 250, height: 250 }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Validates PNG magic bytes.
- */
 function isPngBuffer(buffer: Buffer): boolean {
   if (!Buffer.isBuffer(buffer) || buffer.length < 8) return false
-  return PNG_MAGIC.equals(buffer.slice(0, 8))
+  return PNG_MAGIC.equals(buffer.subarray(0, 8))
 }
 
-/**
- * Escapes characters for safe inclusion in SVG text.
- */
 export function escapeXml(unsafe: string): string {
   if (!unsafe) return ''
   return unsafe.replace(/[<>&'"]/g, (c) => {
@@ -106,26 +103,14 @@ export function escapeXml(unsafe: string): string {
   })
 }
 
-/**
- * Generates an SVG string for a single text zone to be overlaid.
- */
+// Generic text SVG used for non-name fields (folio small label, etc.)
 function buildTextSvg(text: string, zone: TextZone): string {
   const escaped = escapeXml(text)
-  
-  // Convert align to SVG text-anchor
   let textAnchor = 'start'
   let x = '0'
-  
-  if (zone.align === 'center') {
-    textAnchor = 'middle'
-    x = '50%'
-  } else if (zone.align === 'right') {
-    textAnchor = 'end'
-    x = '100%'
-  }
+  if (zone.align === 'center') { textAnchor = 'middle'; x = '50%' }
+  else if (zone.align === 'right') { textAnchor = 'end'; x = '100%' }
 
-  // The viewbox matches the zone width/height.
-  // We use dominant-baseline central and position y at 50% to vertically center.
   return `
     <svg width="${zone.width}" height="${zone.height}" xmlns="http://www.w3.org/2000/svg">
       <text
@@ -141,33 +126,142 @@ function buildTextSvg(text: string, zone: TextZone): string {
   `
 }
 
+// ── Name rendering: dynamic font size + EB Garamond ──────────────────────────
+
 /**
- * Formats date into a simple string if it's a Date object
+ * Splits a name into N balanced lines (minimising longest-line length).
+ * N=1 returns the name as-is.
  */
-function formatIssuedDate(date?: Date | string | null): string {
-  if (!date) return ''
-  if (typeof date === 'string') return date
-  return date.toISOString().split('T')[0] // Simple YYYY-MM-DD fallback
+function splitIntoNLines(name: string, n: number): string[] {
+  const words = name.trim().split(/\s+/)
+  if (n === 1 || words.length === 1) return [name]
+  if (words.length <= n) return words  // one word per line
+
+  if (n === 2) {
+    let bestSplit = 1
+    let bestMax = Infinity
+    for (let i = 1; i < words.length; i++) {
+      const l1 = words.slice(0, i).join(' ').length
+      const l2 = words.slice(i).join(' ').length
+      const maxLen = Math.max(l1, l2)
+      if (maxLen < bestMax) { bestMax = maxLen; bestSplit = i }
+    }
+    return [words.slice(0, bestSplit).join(' '), words.slice(bestSplit).join(' ')]
+  }
+
+  // n=3: greedy thirds by character count
+  const totalLen = words.reduce((s, w) => s + w.length + 1, 0)
+  const targetLen = totalLen / n
+  const lines: string[] = []
+  let current: string[] = []
+  let currentLen = 0
+  let linesLeft = n
+
+  for (const word of words) {
+    if (linesLeft > 1 && currentLen >= targetLen) {
+      lines.push(current.join(' '))
+      current = [word]
+      currentLen = word.length + 1
+      linesLeft--
+    } else {
+      current.push(word)
+      currentLen += word.length + 1
+    }
+  }
+  lines.push(current.join(' '))
+  return lines
+}
+
+/**
+ * Determines the optimal number of lines and font size so the name
+ * fills the zone both horizontally and vertically.
+ *
+ * Strategy: for N = 1, 2, 3 — calculate the largest font size that
+ * respects both width and height constraints, then pick the N that
+ * yields the largest font (i.e., best fills the zone).
+ */
+function calcNameLayout(
+  name: string,
+  zoneWidth: number,
+  zoneHeight: number
+): { lines: string[]; fontSize: number } {
+  let bestFontSize = 0
+  let bestLines: string[] = [name]
+
+  for (const n of [1, 2, 3]) {
+    const lines = splitIntoNLines(name, n)
+    const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b)
+
+    // Largest font where the longest line fits the zone width
+    const fsByWidth = (zoneWidth * ZONE_FILL_FACTOR) / (longestLine.length * AVG_CHAR_WIDTH_RATIO)
+    // Largest font where all lines (with line height) fit the zone height
+    const fsByHeight = (zoneHeight * ZONE_FILL_FACTOR) / (n * LINE_HEIGHT_RATIO)
+
+    const fontSize = Math.min(fsByWidth, fsByHeight)
+
+    if (fontSize > bestFontSize) {
+      bestFontSize = fontSize
+      bestLines = lines
+    }
+  }
+
+  return { lines: bestLines, fontSize: Math.round(bestFontSize) }
+}
+
+/**
+ * Builds the SVG for the name zone with EB Garamond 500 italic,
+ * dynamic font size, and textLength fill per line.
+ */
+function buildNameSvg(name: string, zone: TextZone): string {
+  const fontBase64 = getEbGaramondBase64()
+  const { lines, fontSize } = calcNameLayout(name, zone.width, zone.height)
+
+  const lineHeight = fontSize * LINE_HEIGHT_RATIO
+  const totalTextHeight = (lines.length - 1) * lineHeight + fontSize
+  const firstBaselineY = (zone.height - totalTextHeight) / 2 + fontSize * 0.85
+
+  const textElements = lines.map((line, i) => {
+    const y = firstBaselineY + i * lineHeight
+    return `<text
+        x="0"
+        y="${y.toFixed(1)}"
+        font-family="'EB Garamond', serif"
+        font-size="${fontSize}px"
+        font-weight="500"
+        font-style="italic"
+        fill="${escapeXml(zone.color)}"
+        textLength="${zone.width}"
+        lengthAdjust="spacing"
+      >${escapeXml(line)}</text>`
+  }).join('\n      ')
+
+  return `<svg width="${zone.width}" height="${zone.height}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <style>
+        @font-face {
+          font-family: 'EB Garamond';
+          src: url('data:font/woff;base64,${fontBase64}') format('woff');
+          font-weight: 500;
+          font-style: italic;
+        }
+      </style>
+    </defs>
+    ${textElements}
+  </svg>`
 }
 
 // ── Main Export ───────────────────────────────────────────────────────────────
 
-/**
- * Composes a diploma PNG by overlaying text and images on a base template.
- */
 export async function composeDiplomaPng(params: ComposeDiplomaParams): Promise<Buffer> {
   const {
     templateBuffer,
     fieldZones,
     studentName,
-    program,
     folio,
-    issuedDate,
     qrBuffer,
     photoBuffer
   } = params
 
-  // 1. Validation
   if (!Buffer.isBuffer(templateBuffer) || templateBuffer.length === 0) {
     throw new Error('[composer] templateBuffer must be a non-empty Buffer')
   }
@@ -178,71 +272,61 @@ export async function composeDiplomaPng(params: ComposeDiplomaParams): Promise<B
     throw new Error('[composer] photoBuffer must be a Buffer if provided')
   }
 
-  // 2. Load template and get metadata to preserve dimensions
   const template = sharp(templateBuffer)
   const meta = await template.metadata()
-  
+
   if (!meta.width || !meta.height) {
     throw new Error('[composer] Could not determine template dimensions')
   }
 
-  // 3. Resolve Zones
+  // Resolve zones
   const zStudent = { ...DEFAULT_ZONES.studentName, ...fieldZones?.studentName }
-  const zProgram = { ...DEFAULT_ZONES.program, ...fieldZones?.program }
-  const zFolio = { ...DEFAULT_ZONES.folio, ...fieldZones?.folio }
-  const zDate = { ...DEFAULT_ZONES.issuedDate, ...fieldZones?.issuedDate }
-  const zQr = { ...DEFAULT_ZONES.qr, ...fieldZones?.qr }
-  const zPhoto = { ...DEFAULT_ZONES.photo, ...fieldZones?.photo }
+  const zQr      = { ...DEFAULT_ZONES.qr,          ...fieldZones?.qr }
+  const zPhoto   = { ...DEFAULT_ZONES.photo,        ...fieldZones?.photo }
 
-  // 4. Prepare overlays (sharp composite format)
   const overlays: sharp.OverlayOptions[] = []
 
-  // Add QR code (resized to fit zone)
+  // QR code
   const resizedQr = await sharp(qrBuffer)
     .resize(zQr.width, zQr.height, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
     .toBuffer()
-    
-  overlays.push({
-    input: resizedQr,
-    top: Math.round(zQr.y),
-    left: Math.round(zQr.x)
-  })
+  overlays.push({ input: resizedQr, top: Math.round(zQr.y), left: Math.round(zQr.x) })
 
-  // Add Photo if present
+  // Photo
   if (photoBuffer) {
     const resizedPhoto = await sharp(photoBuffer)
       .resize(zPhoto.width, zPhoto.height, { fit: 'cover' })
       .toBuffer()
-      
+    overlays.push({ input: resizedPhoto, top: Math.round(zPhoto.y), left: Math.round(zPhoto.x) })
+  }
+
+  // Name — EB Garamond italic, dynamic size, fills zone
+  const nameSvg = buildNameSvg(studentName, zStudent)
+  overlays.push({
+    input: Buffer.from(nameSvg),
+    top: Math.round(zStudent.y),
+    left: Math.round(zStudent.x)
+  })
+
+  // Folio — small text below QR, harmonious with the design
+  if (folio) {
+    const folioHeight = Math.max(30, Math.round(zQr.height * 0.15))
+    const folioZone: TextZone = {
+      x: 0, y: 0,
+      width: zQr.width,
+      height: folioHeight,
+      fontSize: Math.max(14, Math.round(zQr.width * 0.07)),
+      color: '#888888',
+      fontFamily: 'sans-serif',
+      align: 'center'
+    }
+    const folioSvg = buildTextSvg(folio, folioZone)
     overlays.push({
-      input: resizedPhoto,
-      top: Math.round(zPhoto.y),
-      left: Math.round(zPhoto.x)
+      input: Buffer.from(folioSvg),
+      top: Math.round(zQr.y + zQr.height + 6),
+      left: Math.round(zQr.x)
     })
   }
 
-  // Add Texts via SVG
-  const texts = [
-    { text: studentName, zone: zStudent },
-    { text: program, zone: zProgram },
-    { text: formatIssuedDate(issuedDate), zone: zDate },
-    { text: folio, zone: zFolio }
-  ]
-
-  for (const { text, zone } of texts) {
-    if (!text) continue
-    
-    const svg = buildTextSvg(text, zone)
-    overlays.push({
-      input: Buffer.from(svg),
-      top: Math.round(zone.y),
-      left: Math.round(zone.x)
-    })
-  }
-
-  // 5. Composite and output
-  return template
-    .composite(overlays)
-    .png()
-    .toBuffer()
+  return template.composite(overlays).png().toBuffer()
 }
