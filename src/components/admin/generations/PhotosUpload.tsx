@@ -6,7 +6,7 @@ import { PhotoErrorsTable } from './PhotoErrorsTable'
 
 const MAX_SIZE_BYTES = 200 * 1024 * 1024 // 200 MB
 
-type ErrorKind = 'invalid_file' | 'unmatched_folio' | 'traversal' | 'size_limit' | 'zip_bomb'
+type ErrorKind = 'invalid_file' | 'unmatched_name' | 'traversal' | 'size_limit' | 'zip_bomb' | 'duplicate_name' | 'empty_name'
 
 interface PhotoError {
   entry: string
@@ -133,8 +133,8 @@ export function PhotosUpload({ generationId, hasCsv, isDraft, hasPhotos = false 
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-500">
-        El ZIP debe contener archivos PNG/JPG nombrados con el folio del participante.{' '}
-        Ejemplo: <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">SEN-2026-0001.jpg</code> · máx. 200 MB.
+        Sube un ZIP con fotos JPG o PNG. Cada archivo debe llamarse igual que el participante en el CSV.{' '}
+        Ejemplo: <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">Ana García Martínez.jpg</code> · máx. 200 MB.
       </p>
 
       {/* Drop zone */}
@@ -215,7 +215,7 @@ export function PhotosUpload({ generationId, hasCsv, isDraft, hasPhotos = false 
             {summary.unmatched > 0 && (
               <span>
                 <span className="font-semibold text-yellow-700">{summary.unmatched}</span>{' '}
-                <span className="text-gray-500">sin folio coincidente</span>
+                <span className="text-gray-500">sin participante encontrado</span>
               </span>
             )}
             {summary.skipped_errors > 0 && (

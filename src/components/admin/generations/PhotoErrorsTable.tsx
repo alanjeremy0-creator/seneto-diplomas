@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 
-type ErrorKind = 'invalid_file' | 'unmatched_folio' | 'traversal' | 'size_limit' | 'zip_bomb'
+type ErrorKind = 'invalid_file' | 'unmatched_name' | 'traversal' | 'size_limit' | 'zip_bomb' | 'duplicate_name' | 'empty_name'
 
 const ERROR_KIND_LABEL: Record<ErrorKind, string> = {
   invalid_file: 'Archivo no válido',
-  unmatched_folio: 'Folio no encontrado en esta generación',
+  unmatched_name: 'Participante no encontrado en esta generación',
+  duplicate_name: 'Nombre duplicado (no se puede asignar automáticamente)',
+  empty_name: 'Nombre de archivo vacío o inválido',
   traversal: 'Nombre de archivo no permitido',
   size_limit: 'Archivo demasiado grande',
   zip_bomb: 'Archivo comprimido sospechoso',

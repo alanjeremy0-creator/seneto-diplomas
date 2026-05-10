@@ -19,7 +19,7 @@ const MAX_COMPRESSION_RATIO = 50
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png'])
 const ALLOWED_MAGIC_TYPES: AllowedFileType[] = ['png', 'jpg']
 
-type ErrorKind = 'invalid_file' | 'unmatched_folio' | 'traversal' | 'size_limit' | 'zip_bomb'
+type ErrorKind = 'invalid_file' | 'unmatched_name' | 'traversal' | 'size_limit' | 'zip_bomb' | 'duplicate_name' | 'empty_name'
 
 interface PhotoError {
   entry: string
@@ -75,6 +75,23 @@ function streamEntry(
       stream.on('error', reject)
     })
   })
+}
+
+/**
+ * Normalize a participant name for photo matching.
+ * - Lowercase
+ * - Remove diacritics (NFD → strip combining marks)
+ * - Collapse whitespace, treat underscores and hyphens as spaces
+ * - Trim
+ */
+function normalizeParticipantName(raw: string): string {
+  return raw
+    .replace(/[_-]/g, ' ')           // treat _ and - as spaces
+    .normalize('NFD')                  // decompose accented chars
+    .replace(/[\u0300-\u036f]/g, '') // strip combining diacritical marks
+    .toLowerCase()
+    .replace(/\s+/g, ' ')             // collapse multiple spaces
+    .trim()
 }
 
 export async function POST(
@@ -137,12 +154,23 @@ export async function POST(
       throw Errors.VALIDATION('El archivo no es un ZIP válido')
     }
 
-    // Load certificates for this generation (folio → id map)
+    // Load certificates for this generation (normalized name → id map)
     const certificates = await prisma.certificate.findMany({
       where: { generation_id: params.id },
-      select: { id: true, folio: true },
+      select: { id: true, student_name: true },
     })
-    const folioMap = new Map(certificates.map((c) => [c.folio, c.id]))
+
+    // Build name map; track duplicates so we can refuse ambiguous assignments
+    const nameMap = new Map<string, string>()         // normalizedName → certId
+    const duplicateNames = new Set<string>()           // normalizedName keys that appear >1 time
+    for (const c of certificates) {
+      const key = normalizeParticipantName(c.student_name)
+      if (nameMap.has(key)) {
+        duplicateNames.add(key)
+      } else {
+        nameMap.set(key, c.id)
+      }
+    }
 
     // Open ZIP and enumerate entries
     let zipfile: yauzl.ZipFile
@@ -246,28 +274,45 @@ export async function POST(
         continue
       }
 
-      const folio = path.basename(basename, ext)
-      const certId = folioMap.get(folio)
+      const rawName = path.basename(basename, ext)
 
-      if (!certId) {
+      if (!rawName.trim()) {
+        errors.push({ entry: entryName, reason: 'Nombre de archivo vacío o inválido', error_type: 'empty_name' })
+        continue
+      }
+
+      const normalizedKey = normalizeParticipantName(rawName)
+
+      if (duplicateNames.has(normalizedKey)) {
         errors.push({
           entry: entryName,
-          reason: `No se encontró certificado con folio "${folio}"`,
-          error_type: 'unmatched_folio',
+          reason: `Nombre duplicado: "${rawName}". No se puede asignar la foto automáticamente.`,
+          error_type: 'duplicate_name',
         })
         continue
       }
 
-      photoMap.set(folio, { buffer: data, ext, certId })
+      const certId = nameMap.get(normalizedKey)
+
+      if (!certId) {
+        errors.push({
+          entry: entryName,
+          reason: `Participante no encontrado en esta generación`,
+          error_type: 'unmatched_name',
+        })
+        continue
+      }
+
+      photoMap.set(normalizedKey, { buffer: data, ext, certId })
     }
 
     zipfile.close()
 
     const zipStoragePath = `photos/${params.id}/photos.zip`
-    const photoUpdates = Array.from(photoMap.entries()).map(([folio, { ext, certId }]) => ({
+    const photoUpdates = Array.from(photoMap.entries()).map(([normalizedKey, { ext, certId, buffer }]) => ({
       certId,
-      storagePath: `photos/${params.id}/${folio}${ext}`,
-      buffer: photoMap.get(folio)!.buffer,
+      storagePath: `photos/${params.id}/${normalizedKey}${ext}`,
+      buffer,
     }))
 
     // Prisma transaction FIRST — storage writes happen only after it commits (BLOQ-B2-002)
@@ -306,7 +351,7 @@ export async function POST(
       await storage.put(storagePath, buffer)
     }
 
-    const unmatchedCount = errors.filter((e) => e.error_type === 'unmatched_folio').length
+    const unmatchedCount = errors.filter((e) => e.error_type === 'unmatched_name').length
 
     return NextResponse.json(
       {
