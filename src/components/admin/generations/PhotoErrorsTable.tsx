@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-type ErrorKind = 'invalid_file' | 'unmatched_name' | 'traversal' | 'size_limit' | 'zip_bomb' | 'duplicate_name' | 'empty_name'
+type ErrorKind = 'invalid_file' | 'unmatched_name' | 'traversal' | 'size_limit' | 'zip_bomb' | 'duplicate_name' | 'empty_name' | 'invalid_encoding'
 
 const ERROR_KIND_LABEL: Record<ErrorKind, string> = {
   invalid_file: 'Archivo no válido',
@@ -12,6 +12,7 @@ const ERROR_KIND_LABEL: Record<ErrorKind, string> = {
   traversal: 'Nombre de archivo no permitido',
   size_limit: 'Archivo demasiado grande',
   zip_bomb: 'Archivo comprimido sospechoso',
+  invalid_encoding: 'Codificación (encoding) no soportada',
 }
 
 interface PhotoError {

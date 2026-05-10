@@ -19,7 +19,7 @@ const MAX_COMPRESSION_RATIO = 50
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png'])
 const ALLOWED_MAGIC_TYPES: AllowedFileType[] = ['png', 'jpg']
 
-type ErrorKind = 'invalid_file' | 'unmatched_name' | 'traversal' | 'size_limit' | 'zip_bomb' | 'duplicate_name' | 'empty_name'
+type ErrorKind = 'invalid_file' | 'unmatched_name' | 'traversal' | 'size_limit' | 'zip_bomb' | 'duplicate_name' | 'empty_name' | 'invalid_encoding'
 
 interface PhotoError {
   entry: string
@@ -43,7 +43,7 @@ function isSafePath(name: string): boolean {
 
 function openZip(buffer: Buffer): Promise<yauzl.ZipFile> {
   return new Promise((resolve, reject) => {
-    yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
+    yauzl.fromBuffer(buffer, { lazyEntries: true, decodeStrings: false }, (err, zipfile) => {
       if (err || !zipfile) reject(err ?? new Error('No se pudo abrir el ZIP'))
       else resolve(zipfile)
     })
@@ -192,7 +192,11 @@ export async function POST(
       zipfile.readEntry()
     })
 
-    const fileEntries = allEntries.filter((e) => !/\/$/.test(e.fileName))
+    const fileEntries = allEntries.filter((e) => {
+      const rawName = e.fileName as unknown as Buffer
+      // We only need to check if the last byte is a slash (0x2f) to identify a directory
+      return rawName[rawName.length - 1] !== 0x2f
+    })
 
     if (fileEntries.length === 0) {
       throw Errors.VALIDATION('El ZIP no contiene archivos')
@@ -208,7 +212,34 @@ export async function POST(
     let totalUncompressed = 0
 
     for (const entry of fileEntries) {
-      const entryName = entry.fileName
+      const rawName = entry.fileName as unknown as Buffer
+      const isUtf8 = (entry.generalPurposeBitFlag & 0x0800) !== 0
+
+      let entryName = ''
+      let isInvalidEncoding = false
+
+      if (isUtf8) {
+        entryName = rawName.toString('utf8')
+      } else {
+        // Attempt UTF-8 recovery for zips that omit the EFS bit (like macOS zip)
+        const utf8Attempt = rawName.toString('utf8')
+        if (utf8Attempt.includes('\uFFFD')) {
+          // Contains invalid UTF-8 sequences. Not recoverable without CP437 table.
+          entryName = rawName.toString('latin1') // Best effort for error reporting
+          isInvalidEncoding = true
+        } else {
+          entryName = utf8Attempt // It was actually perfect UTF-8
+        }
+      }
+
+      if (isInvalidEncoding) {
+        errors.push({
+          entry: entryName,
+          reason: 'El ZIP contiene nombres de archivo con encoding no compatible. Crea el ZIP desde Finder o guarda los nombres sin acentos.',
+          error_type: 'invalid_encoding',
+        })
+        continue
+      }
 
       if (!isSafePath(entryName)) {
         errors.push({ entry: entryName, reason: 'Ruta peligrosa (path traversal)', error_type: 'traversal' })
@@ -274,19 +305,19 @@ export async function POST(
         continue
       }
 
-      const rawName = path.basename(basename, ext)
+      const participantNameStr = path.basename(basename, ext)
 
-      if (!rawName.trim()) {
+      if (!participantNameStr.trim()) {
         errors.push({ entry: entryName, reason: 'Nombre de archivo vacío o inválido', error_type: 'empty_name' })
         continue
       }
 
-      const normalizedKey = normalizeParticipantName(rawName)
+      const normalizedKey = normalizeParticipantName(participantNameStr)
 
       if (duplicateNames.has(normalizedKey)) {
         errors.push({
           entry: entryName,
-          reason: `Nombre duplicado: "${rawName}". No se puede asignar la foto automáticamente.`,
+          reason: `Nombre duplicado: "${participantNameStr}". No se puede asignar la foto automáticamente.`,
           error_type: 'duplicate_name',
         })
         continue
