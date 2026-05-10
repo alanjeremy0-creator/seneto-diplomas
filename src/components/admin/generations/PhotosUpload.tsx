@@ -125,7 +125,7 @@ export function PhotosUpload({ generationId, hasCsv, isDraft, hasPhotos = false 
   if (!hasCsv) {
     return (
       <p className="text-sm text-gray-400">
-        Sube el CSV de alumnos antes de subir las fotos.
+        Sube el CSV de participantes antes de subir las fotos.
       </p>
     )
   }
@@ -133,7 +133,7 @@ export function PhotosUpload({ generationId, hasCsv, isDraft, hasPhotos = false 
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-500">
-        El ZIP debe contener archivos PNG/JPG nombrados con el folio del alumno.{' '}
+        El ZIP debe contener archivos PNG/JPG nombrados con el folio del participante.{' '}
         Ejemplo: <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">SEN-2026-0001.jpg</code> · máx. 200 MB.
       </p>
 

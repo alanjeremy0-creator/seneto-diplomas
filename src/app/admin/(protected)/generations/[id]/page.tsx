@@ -78,12 +78,12 @@ export default async function GenerationDetailPage({ params }: { params: { id: s
         <h2 className="text-sm font-medium text-gray-700">Resumen</h2>
         {isDraft && total_count === 0 ? (
           <p className="mt-4 text-sm text-gray-400">
-            Sube la plantilla, define las zonas y carga el CSV de alumnos para comenzar.
+            Sube la plantilla, define las zonas y carga el CSV de participantes para comenzar.
           </p>
         ) : (
           <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
-              <dt className="text-xs text-gray-500">Alumnos</dt>
+              <dt className="text-xs text-gray-500">Participantes</dt>
               <dd className="mt-1 text-2xl font-semibold text-gray-900">{total_count}</dd>
             </div>
             <div>
@@ -135,10 +135,10 @@ export default async function GenerationDetailPage({ params }: { params: { id: s
 
       {/* CSV upload — FE-007 */}
       <section className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-        <h2 className="mb-4 text-sm font-medium text-gray-700">Alumnos (CSV)</h2>
+        <h2 className="mb-4 text-sm font-medium text-gray-700">Participantes (CSV)</h2>
         {total_count === 0 && status === 'draft' ? (
           <p className="mb-4 text-sm text-gray-400">
-            Sube el CSV para agregar alumnos a esta generación.
+            Sube el CSV para agregar participantes a esta generación.
           </p>
         ) : null}
         <CsvUpload

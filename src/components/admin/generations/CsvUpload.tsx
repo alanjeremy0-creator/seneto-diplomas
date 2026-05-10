@@ -212,9 +212,9 @@ export function CsvUpload({ generationId, hasExistingStudents, disabled = false 
 
       {/* Re-upload confirmation dialog */}
       {confirmPending && (
-        <div role="dialog" aria-modal="true" aria-label="Confirmar reemplazo de alumnos" className="rounded-lg border border-yellow-300 bg-yellow-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="Confirmar reemplazo de participantes" className="rounded-lg border border-yellow-300 bg-yellow-50 p-4">
           <p className="text-sm font-medium text-yellow-800">
-            Esto reemplazará los alumnos actuales. ¿Deseas continuar?
+            Esto reemplazará los participantes actuales. ¿Deseas continuar?
           </p>
           <div className="mt-3 flex gap-3">
             <button

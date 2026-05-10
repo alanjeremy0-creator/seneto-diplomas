@@ -520,3 +520,38 @@ El route handler que sirve archivos del storage debe requerir `getServerSession`
 ### Checklist de seguridad mínima antes del primer deploy
 
 Ver checklist completo en [`docs/SECURITY_AUDIT.md` sección 5](./SECURITY_AUDIT.md). Los ítems bloqueantes son: C1, C2 (verification_token), C3 (rate limiting), C4 (archivos autenticados), C5 (AuditLog), QW1 (.gitignore), QW3 (JWT maxAge), QW4 (path traversal), ND4 (assertOwnership), ND5 (enum UserRole).
+
+---
+
+## 12. Decisión Sprint 3A — Generación async fire-and-forget
+
+### Decisión
+
+El endpoint `POST /api/generations/[id]/start` lanza `runGenerationEngine()` en modo fire-and-forget después de responder HTTP `202 { status: "processing" }`:
+
+```ts
+runGenerationEngine(params.id).catch(async (err) => {
+  // fallback: marca la generación como failed
+})
+```
+
+### Condición de validez
+
+Esta decisión es **aceptable para el MVP únicamente si el entorno de ejecución es Node.js long-running** (Railway, Render, VPS, `next start` en proceso persistente). En ese contexto, el proceso no termina al responder HTTP y el engine puede completarse de forma normal.
+
+### Riesgo en entorno serverless
+
+Si el deploy objetivo cambia a un entorno serverless (Vercel Edge Functions, AWS Lambda, Cloudflare Workers), **este patrón es un blocker de arquitectura**: la función de servidor puede terminar inmediatamente después de enviar la respuesta `202`, antes de que el engine complete. La generación quedaría atascada en estado `processing` indefinidamente y el fallback `.catch()` nunca se ejecutaría.
+
+### Deuda Sprint 3B / hardening pre-producción
+
+Antes de un deploy productivo en entorno serverless, debe implementarse uno de estos mecanismos:
+
+- Job queue dedicado (BullMQ + Redis, o equivalente)
+- Worker process separado que consuma una tabla de jobs en PostgreSQL
+- Recovery automático: un endpoint o cron que detecte generaciones atascadas en `processing` por más de N minutos y las marque `failed`
+
+### Deuda de cobertura relacionada
+
+- Test HTTP real de `POST /api/generations/[id]/start` con sesión NextAuth, `validateOrigin` y `assertOwnership` (actualmente ningún script lo prueba — ver `scripts/qa-e2e.ts` TODO Sprint 3B)
+- Test real de `GET /v/[token]` con request HTTP contra el endpoint real

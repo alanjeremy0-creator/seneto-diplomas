@@ -43,7 +43,7 @@ export function CsvErrorsTable({ errors }: Props) {
             <thead>
               <tr className="bg-red-100 text-left text-red-700">
                 <th className="px-4 py-2 font-medium">Fila</th>
-                <th className="px-4 py-2 font-medium">Alumno</th>
+                <th className="px-4 py-2 font-medium">Participante</th>
                 <th className="px-4 py-2 font-medium">Motivo</th>
               </tr>
             </thead>

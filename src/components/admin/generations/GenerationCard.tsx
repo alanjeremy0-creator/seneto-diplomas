@@ -39,7 +39,7 @@ export function GenerationCard({ generation }: { generation: GenerationListItem 
 
       <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
         <span>
-          <span className="font-medium text-gray-700">{total_count}</span> alumnos
+          <span className="font-medium text-gray-700">{total_count}</span> participantes
         </span>
         {processed_count > 0 && (
           <span>

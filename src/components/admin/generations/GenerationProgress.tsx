@@ -137,7 +137,7 @@ export function GenerationProgress({
         <div>
           <p className="text-sm font-medium text-red-800">La generación falló</p>
           <p className="mt-0.5 text-xs text-red-700">
-            Revisa los errores en la sección de alumnos y vuelve a ejecutar el proceso desde la verificación previa.
+            Revisa los errores en la sección de participantes y vuelve a generar diplomas desde la verificación previa.
           </p>
         </div>
       </div>
@@ -209,7 +209,7 @@ export function GenerationProgress({
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              {starting ? 'Iniciando...' : 'Sí, iniciar'}
+              {starting ? 'Generando...' : 'Sí, generar diplomas'}
             </button>
             <button
               type="button"
@@ -227,7 +227,7 @@ export function GenerationProgress({
           onClick={() => { setError(''); setConfirming(true) }}
           className="inline-flex w-full sm:w-auto min-h-[44px] items-center justify-center gap-2 rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
         >
-          Iniciar generación
+          Generar diplomas
         </button>
       )}
     </div>

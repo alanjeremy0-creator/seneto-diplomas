@@ -33,7 +33,7 @@ export default async function GenerationsPage() {
       {generations.length === 0 ? (
         <EmptyState
           title="Sin generaciones todavía"
-          description="Crea tu primera generación para comenzar a cargar alumnos y generar diplomas."
+          description="Crea tu primera generación para comenzar a cargar participantes y generar diplomas."
         />
       ) : (
         <GenerationList generations={generations} />

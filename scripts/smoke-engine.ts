@@ -13,6 +13,7 @@ process.env.PUBLIC_VERIFY_BASE_URL = 'http://localhost:3000'
 import { prisma } from '../src/lib/db'
 import { storage } from '../src/lib/storage/adapter'
 import { runGenerationEngine } from '../src/lib/diploma/engine'
+import { randomUUID } from 'crypto'
 import sharp from 'sharp'
 import fs from 'fs/promises'
 import path from 'path'
@@ -107,7 +108,7 @@ async function setup() {
     data: {
       id: CERT_ID_1,
       folio: FOLIO,
-      verification_token: 'smoke-token-1234',
+      verification_token: randomUUID(),
       generation_id: GEN_ID,
       student_name: 'Smoke Student',
       status: 'pending'
