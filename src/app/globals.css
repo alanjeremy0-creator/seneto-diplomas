@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import '@fontsource/eb-garamond/500-italic.css';
-
 :root {
   --background: #ffffff;
   --foreground: #171717;

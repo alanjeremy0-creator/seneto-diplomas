@@ -188,10 +188,7 @@ export function VerificationCard({ status, folio, studentName, program, issuedDa
             <span className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#6b7280]">
               Participante
             </span>
-            <span
-              className="mt-0.5 text-[24px] leading-[1.2] tracking-[-0.01em] text-[#1a1a1a] sm:text-[28px]"
-              style={{ fontFamily: "'EB Garamond', serif", fontWeight: 500, fontStyle: 'italic' }}
-            >
+            <span className="mt-0.5 text-[24px] font-bold leading-[1.2] tracking-[-0.02em] text-[#1a1a1a] sm:text-[28px]">
               <StudentName value={studentName} />
             </span>
           </div>
