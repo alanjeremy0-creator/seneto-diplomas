@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    serverComponentsExternalPackages: ['canvas', 'sharp'],
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
