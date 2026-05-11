@@ -114,7 +114,7 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
         photoBuffer
       })
 
-      const pdfBuffer = await embedPngInPdf(pngBuffer)
+      const pdfBuffer = await embedPngInPdf(pngBuffer, { pagePreset: 'LETTER_PORTRAIT' })
       // pdfBuffer might be Uint8Array from pdf-lib
       const pdfNodeBuffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer)
 

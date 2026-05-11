@@ -174,6 +174,10 @@ export function VerificationCard({ status, folio, studentName, program, issuedDa
               height={444}
               className="h-auto w-full"
             />
+            <p className="mt-2.5 text-center text-[11px] leading-relaxed text-[#6b7280]">
+              El diploma tiene aval de la Facultad de Enfermería y Obstetricia, UAEMéx, Colegio de
+              Enfermería del Estado de México y Colegio de Nefrólogos de Puebla.
+            </p>
           </div>
         </div>
 
@@ -184,7 +188,10 @@ export function VerificationCard({ status, folio, studentName, program, issuedDa
             <span className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#6b7280]">
               Participante
             </span>
-            <span className="mt-0.5 text-[24px] font-bold leading-[1.2] tracking-[-0.02em] text-[#1a1a1a] sm:text-[28px]">
+            <span
+              className="mt-0.5 text-[24px] leading-[1.2] tracking-[-0.01em] text-[#1a1a1a] sm:text-[28px]"
+              style={{ fontFamily: "'EB Garamond', serif", fontWeight: 500, fontStyle: 'italic' }}
+            >
               <StudentName value={studentName} />
             </span>
           </div>

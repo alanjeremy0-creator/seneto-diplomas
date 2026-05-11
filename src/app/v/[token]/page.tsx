@@ -42,7 +42,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
       />
 
       {/* Topbar */}
-      <header className="relative z-10 flex items-center border-b border-[#ececec] bg-white/70 px-5 py-4 backdrop-blur-md sm:px-8 sm:py-5">
+      <header className="relative z-10 flex items-center justify-center border-b border-[#ececec] bg-white/70 px-5 py-4 backdrop-blur-md sm:px-8 sm:py-5">
         <div className="flex items-center gap-3">
           <Image
             src="/assets/brand/SENETO_logo.png"
@@ -86,13 +86,13 @@ function PageShell({ children }: { children: React.ReactNode }) {
             target="_blank"
             className="text-[#4b5563] no-underline hover:text-[#c9354d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a8ab5]"
           >
-            seneto.com
+            corporativoseneto.com
           </a>
           <span className="text-[#9ca3af]">Privacidad</span>
         </div>
         <p className="mx-auto mt-2 max-w-[480px] leading-relaxed">
           Esta página confirma la autenticidad de credenciales emitidas por Seneto. No expone datos
-          personales sensibles. Para reportar uso indebido escribe a verificacion@seneto.com.
+          personales sensibles. Para reportar uso indebido escribe a admin@corporativoseneto.com.
         </p>
       </footer>
     </div>
