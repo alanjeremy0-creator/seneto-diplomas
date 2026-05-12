@@ -100,7 +100,7 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
         formattedDate = new Date(cert.issued_date).toISOString().split('T')[0]
       }
 
-      const pngBuffer = await composeDiplomaPng({
+      let pngBuffer: Buffer = await composeDiplomaPng({
         templateBuffer,
         fieldZones,
         studentName: cert.student_name,
@@ -112,13 +112,16 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
       })
 
       const pdfBuffer = await embedPngInPdf(pngBuffer, { pagePreset: 'LETTER_PORTRAIT' })
-      const pdfNodeBuffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer)
+      let pdfNodeBuffer: Buffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer)
 
       const pngPath = `diplomas/${generationId}/${cert.folio}.png`
       const pdfPath = `diplomas/${generationId}/${cert.folio}.pdf`
 
       await storage.put(pngPath, pngBuffer)
+      pngBuffer = Buffer.alloc(0)  // liberar referencia para GC
+
       await storage.put(pdfPath, pdfNodeBuffer)
+      pdfNodeBuffer = Buffer.alloc(0)  // liberar referencia para GC
 
       await prisma.certificate.update({
         where: { id: cert.id },
