@@ -93,6 +93,46 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json(
+        { error: { code: 'UNAUTHORIZED', message: 'No autorizado' } },
+        { status: 401 }
+      )
+    }
+
+    await assertOwnership(session, params.id)
+
+    const gen = await prisma.generation.findUnique({
+      where: { id: params.id },
+      select: { status: true }
+    })
+    if (!gen) throw Errors.NOT_FOUND('Generación')
+
+    if (gen.status === 'processing') {
+      return NextResponse.json(
+        { error: { code: 'CONFLICT', message: 'No se puede eliminar una generación en proceso' } },
+        { status: 409 }
+      )
+    }
+
+    await prisma.$transaction([
+      prisma.generationError.deleteMany({ where: { generation_id: params.id } }),
+      prisma.certificate.deleteMany({ where: { generation_id: params.id } }),
+      prisma.generation.delete({ where: { id: params.id } }),
+    ])
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
