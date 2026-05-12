@@ -176,7 +176,7 @@ export function VerificationCard({ status, folio, studentName, program, issuedDa
             />
             <p className="mt-2.5 text-center text-[11px] leading-relaxed text-[#6b7280]">
               El diploma tiene aval de la Facultad de Enfermería y Obstetricia, UAEMéx, Colegio de
-              Enfermería del Estado de México y Colegio de Nefrólogos de Puebla.
+              Enfermeras del Estado de México A.C. y Colegio de Nefrologos de Puebla A.C.
             </p>
           </div>
         </div>
