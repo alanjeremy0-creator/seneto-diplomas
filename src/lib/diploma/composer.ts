@@ -220,14 +220,12 @@ function buildNameSvg(name: string, zone: TextZone): string {
   const totalTextHeight = (lines.length - 1) * lineHeight + fontSize
   const firstBaselineY = (zone.height - totalTextHeight) / 2 + fontSize * 0.85
 
-  const cx = (zone.width / 2).toFixed(1)
-
   const textElements = lines.map((line, i) => {
     const y = firstBaselineY + i * lineHeight
     return `<text
-        x="${cx}"
+        x="0"
         y="${y.toFixed(1)}"
-        text-anchor="middle"
+        text-anchor="start"
         font-family="'EB Garamond', serif"
         font-size="${fontSize}px"
         font-weight="500"
