@@ -90,6 +90,66 @@ function validateEntry(entry: ZipEntry, index: number): void {
   }
 }
 
+// ── Streaming export ──────────────────────────────────────────────────────────
+
+/**
+ * Build a ZIP archive reading each PDF lazily (one at a time) via a callback.
+ * Avoids holding all PDF buffers in RAM simultaneously — peak memory is O(1)
+ * instead of O(N), which es crítico para lotes grandes en servidores con poca RAM.
+ */
+export async function buildDiplomasZipLazy(
+  entries: { name: string; getBuffer: () => Promise<Buffer> }[],
+  options: BuildZipOptions = {}
+): Promise<Buffer> {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error('[zipper] entries must be a non-empty array')
+  }
+
+  // Validate names upfront — without loading buffers yet
+  entries.forEach((entry, i) => {
+    const { name } = entry
+    const tag = `entry[${i}] "${name}"`
+    if (!name || typeof name !== 'string') throw new Error(`[zipper] ${tag}: name must be a non-empty string`)
+    if (name.includes('..')) throw new Error(`[zipper] ${tag}: name must not contain '..'`)
+    if (name.startsWith('/') || name.startsWith('\\')) throw new Error(`[zipper] ${tag}: absolute path not allowed`)
+    if (name.includes('/') || name.includes('\\')) throw new Error(`[zipper] ${tag}: path separators not allowed`)
+    if (name.includes('\x00')) throw new Error(`[zipper] ${tag}: null bytes not allowed`)
+    if (!SAFE_NAME_RE.test(name)) throw new Error(`[zipper] ${tag}: disallowed characters`)
+    if (!name.toLowerCase().endsWith('.pdf')) throw new Error(`[zipper] ${tag}: only .pdf allowed`)
+  })
+
+  const names = entries.map(e => e.name.toLowerCase())
+  const duplicates = names.filter((n, i) => names.indexOf(n) !== i)
+  if (duplicates.length > 0) {
+    throw new Error(`[zipper] duplicate entry name(s): ${Array.from(new Set(duplicates)).join(', ')}`)
+  }
+
+  const level = options.compressionLevel ?? 6
+  const archive = archiver.create('zip', { zlib: { level } })
+  const chunks: Buffer[] = []
+
+  const done = new Promise<Buffer>((resolve, reject) => {
+    archive.on('data', (chunk: Buffer) => chunks.push(chunk))
+    archive.on('end', () => resolve(Buffer.concat(chunks)))
+    archive.on('error', (err: Error) => reject(new Error(`[zipper] archiver error: ${err.message}`)))
+    archive.on('warning', (err: archiver.ArchiverError) => {
+      if (err.code !== 'ENOENT') reject(new Error(`[zipper] archiver warning: ${err.message}`))
+    })
+  })
+
+  // Read and append one PDF at a time — only one buffer in RAM per iteration
+  for (const entry of entries) {
+    const buffer = await entry.getBuffer()
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+      throw new Error(`[zipper] empty buffer for ${entry.name}`)
+    }
+    archive.append(Readable.from(buffer), { name: entry.name })
+  }
+  archive.finalize()
+
+  return done
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 /**

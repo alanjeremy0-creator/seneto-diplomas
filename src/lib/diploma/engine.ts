@@ -3,7 +3,7 @@ import { storage } from '../storage/adapter'
 import { generateQrBuffer } from './qr'
 import { composeDiplomaPng, FieldZones as ComposerFieldZones } from './composer'
 import { embedPngInPdf } from './pdf'
-import { buildDiplomasZip } from './zipper'
+import { buildDiplomasZipLazy } from './zipper'
 
 export function mapPrismaZonesToComposer(prismaZones: any): ComposerFieldZones | undefined {
   if (!prismaZones) return undefined
@@ -83,8 +83,6 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
     throw new Error(`Failed to load template buffer: ${err.message}`)
   }
 
-  const zipEntries: { name: string; buffer: Buffer }[] = []
-
   for (const cert of generation.certificates) {
     try {
       let photoBuffer: Buffer | undefined = undefined
@@ -97,7 +95,6 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
         baseUrl
       })
 
-      // Only format issuedDate to YYYY-MM-DD if exists and is valid date
       let formattedDate: string | undefined = undefined
       if (cert.issued_date) {
         formattedDate = new Date(cert.issued_date).toISOString().split('T')[0]
@@ -115,7 +112,6 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
       })
 
       const pdfBuffer = await embedPngInPdf(pngBuffer, { pagePreset: 'LETTER_PORTRAIT' })
-      // pdfBuffer might be Uint8Array from pdf-lib
       const pdfNodeBuffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer)
 
       const pngPath = `diplomas/${generationId}/${cert.folio}.png`
@@ -123,8 +119,6 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
 
       await storage.put(pngPath, pngBuffer)
       await storage.put(pdfPath, pdfNodeBuffer)
-
-      zipEntries.push({ name: `${cert.folio}.pdf`, buffer: pdfNodeBuffer })
 
       await prisma.certificate.update({
         where: { id: cert.id },
@@ -146,10 +140,7 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
 
       await prisma.certificate.update({
         where: { id: cert.id },
-        data: { 
-          // keeping status pending as requested
-          error_message: safeErrorMsg
-        }
+        data: { error_message: safeErrorMsg }
       })
 
       await prisma.generationError.create({
@@ -168,18 +159,32 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
     }
   }
 
-  // Finalization
-  if (zipEntries.length > 0) {
-    const zipBuffer = await buildDiplomasZip(zipEntries)
+  // Finalization: leer PDFs de storage uno por uno para construir el ZIP.
+  // Esto evita acumular todos los buffers en RAM (O(1) en lugar de O(N)).
+  // También incluye diplomas de runs anteriores, soportando reintento parcial.
+  const activeCerts = await prisma.certificate.findMany({
+    where: {
+      generation_id: generationId,
+      status: 'active',
+      diploma_pdf_path: { not: null }
+    },
+    select: { folio: true, diploma_pdf_path: true },
+    orderBy: { folio: 'asc' }
+  })
+
+  if (activeCerts.length > 0) {
+    const zipBuffer = await buildDiplomasZipLazy(
+      activeCerts.map(c => ({
+        name: `${c.folio}.pdf`,
+        getBuffer: () => storage.get(c.diploma_pdf_path!)
+      }))
+    )
     const zipPath = `zips/${generationId}/diplomas.zip`
     await storage.put(zipPath, zipBuffer)
 
     await prisma.generation.update({
       where: { id: generationId },
-      data: {
-        status: 'completed',
-        zip_path: zipPath
-      }
+      data: { status: 'completed', zip_path: zipPath }
     })
   } else {
     await prisma.generation.update({
