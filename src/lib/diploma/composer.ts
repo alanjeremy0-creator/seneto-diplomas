@@ -59,12 +59,12 @@ function getEbGaramondBase64(): string {
 
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
-// Calibrated for EB Garamond 500 italic Latin characters
-const AVG_CHAR_WIDTH_RATIO = 0.52
+// EB Garamond 500 italic runs wider than generic sans-serif — 0.60 prevents overflow
+const AVG_CHAR_WIDTH_RATIO = 0.60
 const LINE_HEIGHT_RATIO = 1.3
 
-// Margin applied so text doesn't touch zone edges
-const ZONE_FILL_FACTOR = 0.92
+// 0.85 leaves breathing room so glyphs never touch zone edges
+const ZONE_FILL_FACTOR = 0.85
 
 export const DEFAULT_ZONES: {
   studentName: TextZone
@@ -220,22 +220,23 @@ function buildNameSvg(name: string, zone: TextZone): string {
   const totalTextHeight = (lines.length - 1) * lineHeight + fontSize
   const firstBaselineY = (zone.height - totalTextHeight) / 2 + fontSize * 0.85
 
+  const cx = (zone.width / 2).toFixed(1)
+
   const textElements = lines.map((line, i) => {
     const y = firstBaselineY + i * lineHeight
     return `<text
-        x="0"
+        x="${cx}"
         y="${y.toFixed(1)}"
+        text-anchor="middle"
         font-family="'EB Garamond', serif"
         font-size="${fontSize}px"
         font-weight="500"
         font-style="italic"
         fill="${escapeXml(zone.color)}"
-        textLength="${zone.width}"
-        lengthAdjust="spacing"
       >${escapeXml(line)}</text>`
   }).join('\n      ')
 
-  return `<svg width="${zone.width}" height="${zone.height}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="${zone.width}" height="${zone.height}" overflow="hidden" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <style>
         @font-face {
