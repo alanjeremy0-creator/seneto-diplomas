@@ -42,10 +42,11 @@ export async function GET(
       )
     }
 
-    // Ownership check: templates/{generationId}/... y photos/{generationId}/...
-    // son archivos privados de una generación; verificar propiedad antes de servir.
+    // Ownership check: todos los prefijos que contienen assets de una generación
+    // requieren verificar que el admin autenticado sea propietario de ese generationId.
     const [prefix, generationId] = params.path
-    if ((prefix === 'templates' || prefix === 'photos') && generationId) {
+    const PREFIXES_WITH_OWNERSHIP = ['templates', 'photos', 'diplomas', 'zips', 'generations']
+    if (PREFIXES_WITH_OWNERSHIP.includes(prefix) && generationId) {
       await assertOwnership(session, generationId)
     }
 

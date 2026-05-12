@@ -16,14 +16,20 @@ const LOCKOUT_MS = 15 * 60 * 1000  // 15 minutos
 export function getClientIp(
   headers: Record<string, string | string[] | undefined>
 ): string {
-  const forwarded = headers['x-forwarded-for']
-  if (forwarded) {
-    const first = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0]
-    return first.trim()
-  }
+  // Render añade x-real-ip con la IP real del socket — no manipulable por el cliente.
+  // Usarlo como primera opción para que el rate limiting no sea bypasseable via
+  // X-Forwarded-For arbitrario que el cliente puede falsificar.
   const realIp = headers['x-real-ip']
   if (realIp) {
     return (Array.isArray(realIp) ? realIp[0] : realIp).trim()
+  }
+  // Fallback: último valor de X-Forwarded-For (añadido por el proxy más cercano),
+  // no el primero (que puede ser falsificado por el cliente).
+  const forwarded = headers['x-forwarded-for']
+  if (forwarded) {
+    const chain = Array.isArray(forwarded) ? forwarded.join(',') : forwarded
+    const last = chain.split(',').pop()
+    if (last) return last.trim()
   }
   return 'unknown'
 }

@@ -33,15 +33,16 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         })
 
-        // Respuesta genérica — no revelar si el usuario existe o no
-        if (!user) {
-          recordFailedLogin(ip)
-          await logAction({ action: 'auth.login_failed', ip })
-          return null
-        }
+        // Ejecutar bcrypt siempre, exista o no el usuario, para evitar timing
+        // side-channel que permita enumerar emails registrados por tiempo de respuesta.
+        const DUMMY_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uR6JOsJI4h3EW2yGJ5X5h9WXf9ZIlO6e'
+        const valid = await bcrypt.compare(
+          credentials.password,
+          user?.password_hash ?? DUMMY_HASH
+        )
 
-        const valid = await bcrypt.compare(credentials.password, user.password_hash)
-        if (!valid) {
+        // Respuesta genérica — no revelar si el usuario existe o no
+        if (!user || !valid) {
           recordFailedLogin(ip)
           await logAction({ action: 'auth.login_failed', ip })
           return null
