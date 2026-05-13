@@ -1,4 +1,4 @@
-// TEMPORAL — eliminar después de revocar los certificados incorrectos.
+// TEMPORAL — eliminar después de limpiar los certificados incorrectos.
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -10,16 +10,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  const { generationIds, studentNames }: {
+  const { generationIds, studentNames, action = 'revoke' }: {
     generationIds: string[]
     studentNames: string[]
+    action?: 'revoke' | 'delete'
   } = await req.json()
 
   if (!generationIds?.length || !studentNames?.length) {
     return NextResponse.json({ error: 'generationIds y studentNames son requeridos' }, { status: 400 })
   }
 
-  // Buscar certificados que coincidan en esas generaciones
   const found = await prisma.certificate.findMany({
     where: {
       generation_id: { in: generationIds },
@@ -29,28 +29,29 @@ export async function POST(req: NextRequest) {
   })
 
   if (found.length === 0) {
-    return NextResponse.json({ ok: true, revoked: 0, detail: 'No se encontraron certificados con esos nombres.' })
+    return NextResponse.json({ ok: true, affected: 0, detail: 'No se encontraron certificados con esos nombres.' })
   }
 
-  // Revocar solo los que están activos
-  const toRevoke = found.filter(c => c.status === 'active').map(c => c.id)
+  const ids = found.map(c => c.id)
 
-  if (toRevoke.length > 0) {
-    await prisma.certificate.updateMany({
-      where: { id: { in: toRevoke } },
-      data: { status: 'revoked' }
+  if (action === 'delete') {
+    await prisma.certificate.deleteMany({ where: { id: { in: ids } } })
+    return NextResponse.json({
+      ok: true,
+      deleted: found.length,
+      detail: found.map(c => ({ folio: c.folio, name: c.student_name, action: 'eliminado' }))
     })
   }
 
+  // default: revoke
+  await prisma.certificate.updateMany({
+    where: { id: { in: ids } },
+    data: { status: 'revoked' }
+  })
+
   return NextResponse.json({
     ok: true,
-    revoked: toRevoke.length,
-    detail: found.map(c => ({
-      folio: c.folio,
-      name: c.student_name,
-      generation_id: c.generation_id,
-      status_before: c.status,
-      action: toRevoke.includes(c.id) ? 'revocado' : 'ya estaba en ' + c.status
-    }))
+    revoked: found.length,
+    detail: found.map(c => ({ folio: c.folio, name: c.student_name, action: 'revocado' }))
   })
 }
