@@ -2,6 +2,10 @@ import sharp from 'sharp'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
+// Disable libvips cache and limit worker threads to reduce peak memory
+sharp.cache(false)
+sharp.concurrency(1)
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface TextZone {

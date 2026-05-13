@@ -160,6 +160,9 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
         data: { error_count: { increment: 1 } }
       })
     }
+
+    // Yield the event loop so V8 can collect freed buffers before next diploma
+    await new Promise<void>(r => setImmediate(r))
   }
 
   // Finalization: leer PDFs de storage uno por uno para construir el ZIP.
