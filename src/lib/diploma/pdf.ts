@@ -21,6 +21,7 @@ export const PAGE_PRESETS = {
   A4_LANDSCAPE:  [PageSizes.A4[1], PageSizes.A4[0]] as [number, number], // [841.89, 595.28]
   LETTER_PORTRAIT:  PageSizes.Letter,                    // [612, 792]
   LETTER_LANDSCAPE: [PageSizes.Letter[1], PageSizes.Letter[0]] as [number, number],
+  DIPLOMA_PORTRAIT: [595.28, 836.22] as [number, number], // 21 cm × 29.5 cm
 } as const
 
 export type PagePreset = keyof typeof PAGE_PRESETS

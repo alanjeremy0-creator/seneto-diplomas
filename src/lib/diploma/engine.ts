@@ -111,7 +111,7 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
         photoBuffer
       })
 
-      const pdfBuffer = await embedPngInPdf(pngBuffer, { pagePreset: 'LETTER_PORTRAIT' })
+      const pdfBuffer = await embedPngInPdf(pngBuffer, { pagePreset: 'DIPLOMA_PORTRAIT' })
       let pdfNodeBuffer: Buffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer)
 
       const pngPath = `diplomas/${generationId}/${cert.folio}.png`
