@@ -2,8 +2,11 @@ import Image from 'next/image'
 import { StudentName } from './StudentName'
 import type { CertificateStatus } from '@/types/index'
 
-// Generation with custom institutional logos and endorsement text
-const GEN2_ID = 'cmp4xe4y300011sj21x9eb0x1'
+// Generations with custom institutional logos and endorsement text
+const GEN2_IDS = new Set([
+  'cmp4xe4y300011sj21x9eb0x1',
+  'cmp5nemwb00011sk5m91gv95i',
+])
 
 interface Props {
   status: CertificateStatus
@@ -126,7 +129,7 @@ export function VerificationCard({ status, folio, studentName, program, issuedDa
   const trust = getTrust(status)
   const icon3d = getIcon3d(status)
   const formattedDate = formatDate(issuedDate)
-  const isGen2 = generationId === GEN2_ID
+  const isGen2 = generationId != null && GEN2_IDS.has(generationId)
 
   return (
     <>
