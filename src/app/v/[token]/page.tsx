@@ -122,6 +122,7 @@ export default async function VerifyPage({
     student_name: string
     program: string | null
     issued_date: Date | null
+    generation_id: string
   } | null
 
   try {
@@ -133,6 +134,7 @@ export default async function VerifyPage({
         student_name: true,
         program: true,
         issued_date: true,
+        generation_id: true,
       },
     })
     cert = raw ? { ...raw, status: raw.status as CertificateStatus } : null
@@ -160,6 +162,7 @@ export default async function VerifyPage({
         studentName={cert.student_name}
         program={cert.program}
         issuedDate={cert.issued_date ? cert.issued_date.toISOString() : null}
+        generationId={cert.generation_id}
       />
     </PageShell>
   )

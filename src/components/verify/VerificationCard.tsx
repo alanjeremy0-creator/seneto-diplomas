@@ -2,12 +2,16 @@ import Image from 'next/image'
 import { StudentName } from './StudentName'
 import type { CertificateStatus } from '@/types/index'
 
+// Generation with custom institutional logos and endorsement text
+const GEN2_ID = 'cmp4xe4y300011sj21x9eb0x1'
+
 interface Props {
   status: CertificateStatus
   folio: string
   studentName: string | null
   program: string | null
   issuedDate: string | null
+  generationId?: string
 }
 
 function formatDate(iso: string | null): string | null {
@@ -117,11 +121,12 @@ function getTrust(status: CertificateStatus): TrustCfg {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function VerificationCard({ status, folio, studentName, program, issuedDate }: Props) {
+export function VerificationCard({ status, folio, studentName, program, issuedDate, generationId }: Props) {
   const banner = getBanner(status)
   const trust = getTrust(status)
   const icon3d = getIcon3d(status)
   const formattedDate = formatDate(issuedDate)
+  const isGen2 = generationId === GEN2_ID
 
   return (
     <>
@@ -168,15 +173,16 @@ export function VerificationCard({ status, folio, studentName, program, issuedDa
           </div>
           <div className="px-[22px] pb-5 sm:px-8">
             <Image
-              src="/assets/brand/logos_instituciones-01.png"
+              src={isGen2 ? '/assets/brand/logos_gen2.png' : '/assets/brand/logos_instituciones-01.png'}
               alt="Instituciones avaladoras"
-              width={1782}
-              height={444}
+              width={isGen2 ? 1196 : 1782}
+              height={isGen2 ? 252 : 444}
               className="h-auto w-full"
             />
             <p className="mt-2.5 text-center text-[11px] leading-relaxed text-[#6b7280]">
-              El diploma tiene aval de la Facultad de Enfermería y Obstetricia, UAEMéx, Colegio de
-              Enfermeras del Estado de México A.C. y Colegio de Nefrologos de Puebla A.C.
+              {isGen2
+                ? 'El diploma tiene aval del Colegio de Nefrologos de Puebla A.C., SENETO Nefrología, Facultad de Medicina de la UAEMéx.'
+                : 'El diploma tiene aval de la Facultad de Enfermería y Obstetricia, UAEMéx, Colegio de Enfermeras del Estado de México A.C. y Colegio de Nefrologos de Puebla A.C.'}
             </p>
           </div>
         </div>
