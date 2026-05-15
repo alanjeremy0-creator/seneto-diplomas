@@ -6,6 +6,7 @@ import type { CertificateStatus } from '@/types/index'
 const GEN2_IDS = new Set([
   'cmp4xe4y300011sj21x9eb0x1',
   'cmp5nemwb00011sk5m91gv95i',
+  'cmp6blj0q00011si0ew2l6wlz',
 ])
 
 interface Props {
