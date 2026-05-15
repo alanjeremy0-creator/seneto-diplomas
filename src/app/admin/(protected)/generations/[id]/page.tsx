@@ -12,6 +12,7 @@ import { PhotosUpload } from '@/components/admin/generations/PhotosUpload'
 import { PreflightPanel } from '@/components/admin/generations/PreflightPanel'
 import { GenerationProgress } from '@/components/admin/generations/GenerationProgress'
 import { DownloadButtons } from '@/components/admin/generations/DownloadButtons'
+import { AssignNames } from '@/components/admin/certificates/AssignNames'
 import type { FieldZones, GenerationStatus } from '@/types/index'
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
@@ -46,6 +47,12 @@ export default async function GenerationDetailPage({ params }: { params: { id: s
 
   const hasPhotos = photos_zip_path !== null
   const isDraft = status === 'draft'
+
+  const emptyCerts = await prisma.certificate.findMany({
+    where: { generation_id: generation.id, student_name: '' },
+    select: { folio: true },
+    orderBy: { folio: 'asc' },
+  })
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -189,6 +196,17 @@ export default async function GenerationDetailPage({ params }: { params: { id: s
           errorCount={error_count}
         />
       </section>
+
+      {/* Assign names — shown when there are certificates without participant name */}
+      {emptyCerts.length > 0 && (
+        <section className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+          <h2 className="mb-1 text-sm font-medium text-gray-700">Asignar nombres</h2>
+          <p className="mb-4 text-sm text-gray-400">
+            {emptyCerts.length} diploma(s) sin nombre de participante. Escribe el nombre y presiona Guardar o Enter.
+          </p>
+          <AssignNames certs={emptyCerts} />
+        </section>
+      )}
     </div>
   )
 }

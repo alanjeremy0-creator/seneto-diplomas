@@ -303,13 +303,15 @@ export async function composeDiplomaPng(params: ComposeDiplomaParams): Promise<B
     overlays.push({ input: resizedPhoto, top: Math.round(zPhoto.y), left: Math.round(zPhoto.x) })
   }
 
-  // Name — EB Garamond italic, dynamic size, fills zone
-  const nameSvg = buildNameSvg(studentName, zStudent)
-  overlays.push({
-    input: Buffer.from(nameSvg),
-    top: Math.round(zStudent.y),
-    left: Math.round(zStudent.x)
-  })
+  // Name — EB Garamond italic, dynamic size, fills zone (skipped when name is empty)
+  if (studentName && studentName.trim()) {
+    const nameSvg = buildNameSvg(studentName, zStudent)
+    overlays.push({
+      input: Buffer.from(nameSvg),
+      top: Math.round(zStudent.y),
+      left: Math.round(zStudent.x)
+    })
+  }
 
   // Folio — small text below QR, harmonious with the design
   if (folio) {

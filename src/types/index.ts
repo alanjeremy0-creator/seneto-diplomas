@@ -104,7 +104,7 @@ export interface GenerationError {
 
 // MVP: photos matched by folio (filename = folio), not by archivo_foto column
 export interface StudentCSVRow {
-  student_name: string
+  student_name?: string
   email?: string
   program?: string
   issued_date?: string

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { assertOwnership } from '@/lib/api/ownership'
 import { handleApiError, Errors } from '@/lib/api/errors'
+import { validateOrigin } from '@/lib/api/origin'
 
 // photo_path and generation_id fetched internally; photo_path stripped, generation_id
 // kept in response (not sensitive — mirrors generation.id in nested object)
@@ -53,6 +54,55 @@ export async function GET(
     const certificate = { ...rest, has_photo: !!photo_path }
 
     return NextResponse.json({ certificate })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { folio: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json(
+        { error: { code: 'UNAUTHORIZED', message: 'No autorizado' } },
+        { status: 401 }
+      )
+    }
+
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { error: { code: 'FORBIDDEN', message: 'Origin no permitido' } },
+        { status: 403 }
+      )
+    }
+
+    const raw = await prisma.certificate.findUnique({
+      where: { folio: params.folio },
+      select: { generation_id: true }
+    })
+    if (!raw) throw Errors.NOT_FOUND('Certificado')
+
+    await assertOwnership(session, raw.generation_id)
+
+    const body = await req.json()
+    const { student_name } = body
+
+    if (student_name === undefined) {
+      throw Errors.VALIDATION('No hay campos válidos para actualizar')
+    }
+    if (typeof student_name !== 'string' || !student_name.trim()) {
+      throw Errors.VALIDATION('El nombre no puede estar vacío')
+    }
+
+    await prisma.certificate.update({
+      where: { folio: params.folio },
+      data: { student_name: student_name.trim() }
+    })
+
+    return NextResponse.json({ ok: true })
   } catch (error) {
     return handleApiError(error)
   }

@@ -95,13 +95,7 @@ export function parseCsv(csvText: string): CsvParseResult {
 
   const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase().trim())
   const nameIdx = headers.indexOf('student_name')
-
-  if (nameIdx === -1) {
-    return {
-      rows: [],
-      errors: [{ row_number: 1, error_detail: 'Columna student_name requerida no encontrada' }],
-    }
-  }
+  // student_name is optional — if column absent, all certs get empty name (assigned later)
 
   const colIndex = (col: string) => {
     const idx = headers.indexOf(col)
@@ -123,12 +117,8 @@ export function parseCsv(csvText: string): CsvParseResult {
     // Skip rows where every field is empty (e.g. trailing ",,")
     if (values.every((v) => v.trim() === '')) continue
 
-    const student_name = nameIdx !== null ? (values[nameIdx] ?? '').trim() : ''
-
-    if (!student_name) {
-      errors.push({ row_number: rowNumber, error_detail: 'student_name vacío' })
-      continue
-    }
+    const student_name = nameIdx !== -1 ? (values[nameIdx] ?? '').trim() : ''
+    // Empty student_name is allowed — name can be assigned later via the admin panel
 
     const folio_override =
       folioOverrideIdx !== null ? (values[folioOverrideIdx] ?? '').trim() : ''

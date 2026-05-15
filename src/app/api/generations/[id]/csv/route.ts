@@ -117,7 +117,7 @@ export async function POST(
       return {
         generation_id: params.id,
         folio,
-        student_name: data.student_name,
+        student_name: data.student_name ?? '',
         program: data.program ?? null,
         issued_date: data.issued_date ? new Date(data.issued_date) : null,
         status: 'pending' as const,
