@@ -1,0 +1,49 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Cada 5 días a las 12:00 UTC (antes del límite de 7 días de Supabase)
+    - cron: '0 12 */5 * *'
+  workflow_dispatch: # permite ejecutarlo manualmente desde GitHub
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore Supabase project if paused
+        run: |
+          echo "Verificando estado del proyecto Supabase..."
+
+          STATUS=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+            https://api.supabase.com/v1/projects/orzxfnycvuzuyhugubbk \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','unknown'))")
+
+          echo "Estado actual: $STATUS"
+
+          if [ "$STATUS" = "INACTIVE" ] || [ "$STATUS" = "inactive" ]; then
+            echo "Proyecto pausado. Restaurando..."
+            curl -s -X POST \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+              https://api.supabase.com/v1/projects/orzxfnycvuzuyhugubbk/restore
+            echo "Solicitud de restauración enviada."
+          else
+            echo "Proyecto activo. Sin acción necesaria."
+          fi
+
+      - name: Ping database via PostgREST to register activity
+        env:
+          SUPABASE_URL: https://orzxfnycvuzuyhugubbk.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "Haciendo ping a la base de datos..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/")
+          echo "HTTP status: $RESPONSE"
+          if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "404" ]; then
+            echo "Ping exitoso — base de datos activa."
+          else
+            echo "Warning: respuesta inesperada ($RESPONSE), pero el proyecto fue restaurado."
+          fi
