@@ -100,6 +100,8 @@ npm run dev
 - **Lint:** `npm run lint`
 - **Build de producción:** `npm run build && npm start`
 
+> **Nota Node 24:** Si tu entorno local usa Node 24, `npm run build` falla con `Cannot find module '../server/require-hook'` — es una incompatibilidad de Next.js 14 con el CJS loader de Node 24, no un error de TypeScript. Para desarrollo local usa `npm run dev` (funciona sin problemas en Node 24). El build de producción debe correr en Node 20 (ver `.nvmrc` y sección 13).
+
 ### Variables mínimas para que `next dev` levante
 
 ```
