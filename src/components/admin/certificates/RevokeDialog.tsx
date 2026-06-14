@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Props {
@@ -14,6 +14,7 @@ export function RevokeDialog({ folio, currentStatus, onClose }: Props) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   const isRevoked = currentStatus === 'revoked'
   const action = isRevoked ? 'reactivate' : 'revoke'
@@ -21,6 +22,23 @@ export function RevokeDialog({ folio, currentStatus, onClose }: Props) {
   const confirmColor = isRevoked
     ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
     : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+
+  // Issue 1 — cerrar con Escape
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  // Issue 2 — mover foco al primer elemento focusable al montar
+  useEffect(() => {
+    const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
+      'button, input, [tabindex]:not([tabindex="-1"])'
+    )
+    firstFocusable?.focus()
+  }, [])
 
   async function handleConfirm() {
     setLoading(true)
@@ -54,7 +72,7 @@ export function RevokeDialog({ folio, currentStatus, onClose }: Props) {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <div ref={dialogRef} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
         <h2 id="revoke-dialog-title" className="text-lg font-semibold text-gray-900">
           {label}
         </h2>
@@ -88,11 +106,12 @@ export function RevokeDialog({ folio, currentStatus, onClose }: Props) {
         )}
 
         <div className="mt-6 flex justify-end gap-3">
+          {/* Issue 3 — touch target mínimo 44px en ambos botones */}
           <button
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50"
+            className="min-h-[44px] rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -100,7 +119,7 @@ export function RevokeDialog({ folio, currentStatus, onClose }: Props) {
             type="button"
             onClick={handleConfirm}
             disabled={loading}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${confirmColor}`}
+            className={`min-h-[44px] rounded-lg px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${confirmColor}`}
           >
             {loading ? 'Procesando...' : label}
           </button>
