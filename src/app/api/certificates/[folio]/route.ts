@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { assertOwnership } from '@/lib/api/ownership'
 import { handleApiError, Errors } from '@/lib/api/errors'
 import { validateOrigin } from '@/lib/api/origin'
+import { logAction } from '@/lib/api/audit'
 
 // photo_path and generation_id fetched internally; photo_path stripped, generation_id
 // kept in response (not sensitive — mirrors generation.id in nested object)
@@ -81,13 +82,65 @@ export async function PATCH(
 
     const raw = await prisma.certificate.findUnique({
       where: { folio: params.folio },
-      select: { generation_id: true }
+      select: { id: true, status: true, generation_id: true }
     })
     if (!raw) throw Errors.NOT_FOUND('Certificado')
 
     await assertOwnership(session, raw.generation_id)
 
     const body = await req.json()
+    const user = session.user as { id: string; role: string }
+
+    // ── Revoke / reactivate ───────────────────────────────────────────────────
+    if (body.action === 'revoke' || body.action === 'reactivate') {
+      const action = body.action as 'revoke' | 'reactivate'
+
+      if (action === 'revoke') {
+        if (raw.status === 'revoked') {
+          throw Errors.VALIDATION('El certificado ya está revocado')
+        }
+        await prisma.certificate.update({
+          where: { folio: params.folio },
+          data: {
+            status: 'revoked',
+            revoked_at: new Date(),
+            revocation_reason: (body.reason as string | undefined) ?? null,
+          },
+        })
+        await logAction({
+          action: 'certificate_revoke',
+          userId: user.id,
+          targetId: raw.id,
+          detail: { folio: params.folio, reason: body.reason },
+        })
+      } else {
+        if (raw.status !== 'revoked') {
+          throw Errors.VALIDATION('Solo se puede reactivar un certificado revocado')
+        }
+        await prisma.certificate.update({
+          where: { folio: params.folio },
+          data: {
+            status: 'active',
+            revoked_at: null,
+            revocation_reason: null,
+          },
+        })
+        await logAction({
+          action: 'certificate_reactivate',
+          userId: user.id,
+          targetId: raw.id,
+          detail: { folio: params.folio },
+        })
+      }
+
+      const updated = await prisma.certificate.findUnique({
+        where: { folio: params.folio },
+        select: { status: true, revoked_at: true, revocation_reason: true },
+      })
+      return NextResponse.json({ ok: true, certificate: updated })
+    }
+
+    // ── Update student_name ───────────────────────────────────────────────────
     const { student_name } = body
 
     if (student_name === undefined) {

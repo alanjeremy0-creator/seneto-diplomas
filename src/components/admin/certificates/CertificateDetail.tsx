@@ -1,7 +1,11 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import type { CertificateDetailItem } from '@/types/api'
 import type { CertificateStatus } from '@/types/index'
 import { StatusBadge } from '@/components/admin/StatusBadge'
+import { RevokeDialog } from './RevokeDialog'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -88,10 +92,19 @@ function RevocationBlock({
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function CertificateDetail({ certificate: cert }: { certificate: CertificateDetailItem }) {
+  const [showRevokeDialog, setShowRevokeDialog] = useState(false)
   const isRevoked = cert.status === 'revoked'
 
   return (
     <div className="space-y-6">
+      {showRevokeDialog && (
+        <RevokeDialog
+          folio={cert.folio}
+          currentStatus={cert.status}
+          onClose={() => setShowRevokeDialog(false)}
+        />
+      )}
+
       {/* Header card */}
       <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -105,9 +118,19 @@ export function CertificateDetail({ certificate: cert }: { certificate: Certific
               <p className="mt-0.5 text-sm text-gray-500">{cert.program}</p>
             )}
           </div>
-          {/* StatusBadge — slightly larger context in detail view */}
-          <div className="flex-shrink-0">
+          <div className="flex flex-shrink-0 flex-col items-end gap-3">
             <StatusBadge status={cert.status as CertificateStatus} />
+            <button
+              type="button"
+              onClick={() => setShowRevokeDialog(true)}
+              className={`min-h-[44px] rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                isRevoked
+                  ? 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-400'
+                  : 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
+              }`}
+            >
+              {isRevoked ? 'Reactivar diploma' : 'Revocar diploma'}
+            </button>
           </div>
         </div>
       </div>

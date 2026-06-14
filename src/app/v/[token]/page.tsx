@@ -88,7 +88,14 @@ function PageShell({ children }: { children: React.ReactNode }) {
           >
             corporativoseneto.com
           </a>
-          <span className="text-[#9ca3af]">Privacidad</span>
+          <a
+            href="https://corporativoseneto.com/privacidad"
+            rel="noopener noreferrer"
+            target="_blank"
+            className="text-[#4b5563] no-underline hover:text-[#c9354d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a8ab5]"
+          >
+            Privacidad
+          </a>
         </div>
         <p className="mx-auto mt-2 max-w-[480px] leading-relaxed">
           Esta página confirma la autenticidad de credenciales emitidas por Seneto. No expone datos

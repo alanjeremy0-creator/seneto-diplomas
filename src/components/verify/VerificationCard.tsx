@@ -103,7 +103,7 @@ function getTrust(status: CertificateStatus): TrustCfg {
         icoColor: '#b91c1c',
         icoBg: '#fdecec',
         strong: 'Esta credencial no es válida.',
-        body: 'Seneto ha cancelado este diploma desde el panel administrativo. No debe aceptarse como prueba de capacitación.',
+        body: 'Seneto ha revocado este diploma desde el panel administrativo. No debe aceptarse como prueba de capacitación.',
       }
     case 'expired':
       return {
