@@ -15,6 +15,8 @@ import { DownloadButtons } from '@/components/admin/generations/DownloadButtons'
 import { AssignNames } from '@/components/admin/certificates/AssignNames'
 import type { FieldZones, GenerationStatus } from '@/types/index'
 
+export const dynamic = 'force-dynamic'
+
 export async function generateMetadata({ params }: { params: { id: string } }) {
   return { title: `Generación — Seneto` }
 }

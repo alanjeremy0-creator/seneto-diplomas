@@ -7,6 +7,8 @@ import type { CertificateStatus } from '@/types/index'
 import type { CertificateDetailItem } from '@/types/api'
 import { CertificateDetail } from '@/components/admin/certificates/CertificateDetail'
 
+export const dynamic = 'force-dynamic'
+
 export async function generateMetadata({ params }: { params: { folio: string } }) {
   return { title: `${params.folio} — Certificados — Seneto` }
 }

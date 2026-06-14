@@ -9,6 +9,8 @@ import { CertificateFilters } from '@/components/admin/certificates/CertificateF
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingSkeletonCard } from '@/components/ui/LoadingSkeleton'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = { title: 'Certificados — Seneto' }
 
 const PAGE_SIZE = 20

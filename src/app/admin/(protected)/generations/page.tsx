@@ -6,6 +6,8 @@ import { GenerationList } from '@/components/admin/generations/GenerationList'
 import { CreateGenerationButton } from '@/components/admin/generations/CreateGenerationButton'
 import { EmptyState } from '@/components/ui/EmptyState'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = { title: 'Generaciones — Seneto' }
 
 export default async function GenerationsPage() {

@@ -1,5 +1,5 @@
 import sharp from 'sharp'
-import { readFileSync } from 'fs'
+import { readFile } from 'fs/promises'
 import { join } from 'path'
 
 // Disable libvips cache and limit worker threads to reduce peak memory
@@ -51,11 +51,10 @@ export interface ComposeDiplomaParams {
 // Cached at module level — read once, reused for every diploma in the batch
 let _ebGaramondBase64: string | null = null
 
-function getEbGaramondBase64(): string {
-  if (!_ebGaramondBase64) {
-    const fontPath = join(process.cwd(), 'src/lib/fonts/eb-garamond-500-italic.woff')
-    _ebGaramondBase64 = readFileSync(fontPath).toString('base64')
-  }
+async function getEbGaramondBase64(): Promise<string> {
+  if (_ebGaramondBase64) return _ebGaramondBase64
+  const fontPath = join(process.cwd(), 'src/lib/fonts/eb-garamond-500-italic.woff')
+  _ebGaramondBase64 = (await readFile(fontPath)).toString('base64')
   return _ebGaramondBase64
 }
 
@@ -216,8 +215,8 @@ function calcNameLayout(
  * Builds the SVG for the name zone with EB Garamond 500 italic,
  * dynamic font size, and textLength fill per line.
  */
-function buildNameSvg(name: string, zone: TextZone): string {
-  const fontBase64 = getEbGaramondBase64()
+async function buildNameSvg(name: string, zone: TextZone): Promise<string> {
+  const fontBase64 = await getEbGaramondBase64()
   const { lines, fontSize } = calcNameLayout(name, zone.width, zone.height)
 
   const lineHeight = fontSize * LINE_HEIGHT_RATIO
@@ -305,7 +304,7 @@ export async function composeDiplomaPng(params: ComposeDiplomaParams): Promise<B
 
   // Name — EB Garamond italic, dynamic size, fills zone (skipped when name is empty)
   if (studentName && studentName.trim()) {
-    const nameSvg = buildNameSvg(studentName, zStudent)
+    const nameSvg = await buildNameSvg(studentName, zStudent)
     overlays.push({
       input: Buffer.from(nameSvg),
       top: Math.round(zStudent.y),

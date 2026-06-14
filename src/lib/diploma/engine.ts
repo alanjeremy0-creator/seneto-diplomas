@@ -35,10 +35,27 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
 
   const generation = await prisma.generation.findUnique({
     where: { id: generationId },
-    include: {
-      template: true,
+    select: {
+      id: true,
+      status: true,
+      processed_count: true,
+      template: {
+        select: {
+          file_path: true,
+          field_zones: true,
+        }
+      },
       certificates: {
-        where: { status: 'pending' }
+        where: { status: 'pending' },
+        select: {
+          id: true,
+          folio: true,
+          student_name: true,
+          program: true,
+          issued_date: true,
+          verification_token: true,
+          photo_path: true,
+        }
       }
     }
   })
