@@ -91,6 +91,10 @@ model Certificate {
 
   generation          Generation   @relation(fields: [generation_id], references: [id])
 
+  @@index([generation_id])
+  @@index([status])
+  @@index([verification_token])
+  @@index([folio])
   @@map("certificates")
 }
 
