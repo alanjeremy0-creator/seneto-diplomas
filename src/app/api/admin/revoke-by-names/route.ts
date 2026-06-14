@@ -1,4 +1,3 @@
-// TEMPORAL — eliminar después de limpiar los certificados incorrectos.
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -49,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     if (action === 'delete') {
       await prisma.certificate.deleteMany({ where: { id: { in: ids } } })
-      await logAction({ action: 'certificates_bulk_delete', userId: user.id, detail: { count: ids.length, generationIds } })
+      await logAction({ action: 'certificates_bulk_delete', userId: user.id, detail: { count: ids.length, generationIds, studentNames } })
       return NextResponse.json({
         ok: true,
         deleted: found.length,
@@ -62,7 +61,7 @@ export async function POST(req: NextRequest) {
       where: { id: { in: ids } },
       data: { status: 'revoked', revoked_at: new Date() }
     })
-    await logAction({ action: 'certificates_bulk_revoke', userId: user.id, detail: { count: ids.length, generationIds } })
+    await logAction({ action: 'certificates_bulk_revoke', userId: user.id, detail: { count: ids.length, generationIds, studentNames } })
 
     return NextResponse.json({
       ok: true,

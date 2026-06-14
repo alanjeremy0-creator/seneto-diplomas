@@ -1,4 +1,3 @@
-// TEMPORAL — eliminar después de resetear la generación atascada.
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -52,8 +51,8 @@ export async function POST(
       })
     ])
 
-    const user = session.user as { id: string; role: string }
-    await logAction({ action: 'generation_reset', userId: user.id, targetId: params.id })
+    const userId = (session.user as { id?: string } | undefined)?.id
+    await logAction({ action: 'generation_reset', userId, targetId: params.id })
 
     return NextResponse.json({ ok: true, message: 'Generación reseteada correctamente.' })
   } catch (error) {
