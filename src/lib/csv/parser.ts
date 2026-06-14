@@ -94,8 +94,11 @@ export function parseCsv(csvText: string): CsvParseResult {
   }
 
   const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase().trim())
-  const nameIdx = headers.indexOf('student_name')
-  // student_name is optional — if column absent, all certs get empty name (assigned later)
+  const nameIdx = headers.indexOf('nombre_completo') !== -1
+    ? headers.indexOf('nombre_completo')
+    : headers.indexOf('student_name')
+  // nombre_completo is the canonical column; student_name is accepted for backward compatibility.
+  // If neither column is present, all certs get empty name (assigned later via the admin panel).
 
   const colIndex = (col: string) => {
     const idx = headers.indexOf(col)
