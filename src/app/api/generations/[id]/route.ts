@@ -94,7 +94,7 @@ export async function GET(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -103,6 +103,13 @@ export async function DELETE(
       return NextResponse.json(
         { error: { code: 'UNAUTHORIZED', message: 'No autorizado' } },
         { status: 401 }
+      )
+    }
+
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { error: { code: 'FORBIDDEN', message: 'Origin no permitido' } },
+        { status: 403 }
       )
     }
 
