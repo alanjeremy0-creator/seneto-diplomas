@@ -93,8 +93,6 @@ model Certificate {
 
   @@index([generation_id])
   @@index([status])
-  @@index([verification_token])
-  @@index([folio])
   @@map("certificates")
 }
 
