@@ -4,10 +4,10 @@ const nextConfig = {
     serverComponentsExternalPackages: ['canvas', 'sharp'],
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   async headers() {
     return [

@@ -281,14 +281,18 @@ No instanciar `LocalStorage` directamente — siempre usar el singleton `storage
 
 ### Convención de paths — todos los agentes DEBEN respetar esta estructura
 
+Los paths a continuación reflejan lo que el código implementa en `src/lib/diploma/engine.ts` (verificado 2026-06-13):
+
 ```
 templates/{template_id}/base.png
 generations/{generation_id}/photos/{filename}
-generations/{generation_id}/diplomas/{folio}.pdf
-generations/{generation_id}/diplomas_png/{folio}.png
-generations/{generation_id}/output/{nombre-generación}.zip
+diplomas/{generation_id}/{folio}.png
+diplomas/{generation_id}/{folio}.pdf
+zips/{generation_id}/diplomas.zip
 uploads/temp/{uuid}_{filename}
 ```
+
+> **Nota (2026-06-13):** Los paths de diplomas y ZIPs NO incluyen el prefijo `generations/`. El engine escribe en `diplomas/{generationId}/{folio}.png|pdf` y `zips/{generationId}/diplomas.zip`. Si en el futuro se migra a R2/S3 conviene unificar bajo `generations/`, pero el cambio debe hacerse en engine.ts simultáneamente.
 
 Ningún agente debe inventar paths ad-hoc. Esta convención garantiza que los paths sean predecibles y que la migración a R2/S3 sea directa.
 
@@ -412,7 +416,7 @@ Este middleware redirige automáticamente a `/admin/login` a cualquier usuario n
 - **Tipos de entrada**: `FieldZones` y `Certificate` de `src/types/index.ts` definen exactamente la estructura que recibirá el módulo de generación. El módulo debe aceptar `Certificate` + `Template` (con `field_zones: FieldZones`) y retornar paths de los archivos generados.
 - **Fuente del diploma**: la fuente EB Garamond está en `node_modules/@fontsource/eb-garamond/`. Para `canvas`, usar `registerFont()` con la ruta al archivo `.ttf`.
 - **Template base**: leer el PNG de plantilla desde storage con `storage.get('templates/{template_id}/base.png')`, luego compositar encima con sharp o canvas.
-- **Output del ZIP**: usar `archiver` (ya instalado) para empaquetar todos los diplomas en `generations/{generation_id}/output/{nombre}.zip`.
+- **Output del ZIP**: usar `archiver` (ya instalado) para empaquetar todos los diplomas. El engine guarda el ZIP en `zips/{generation_id}/diplomas.zip` — respetar este path al leer `generation.zip_path` desde la BD.
 - **QR code**: usar el paquete `qrcode` (ya instalado) para generar el QR que apunta a `/verify/{folio}`.
 
 ### Para Agente QA
@@ -443,9 +447,9 @@ Este middleware redirige automáticamente a `/admin/login` a cualquier usuario n
 | `fixtures/template-sample.png` existe | ✅ | PNG 1920×1360px fondo crema |
 | Prisma 7 breaking change documentado | ✅ | Ver sección 3 de este documento |
 | NextAuth documentado con lo que Backend debe completar | ✅ | Route handler y middleware pendientes de Backend |
-| `src/app/api/auth/[...nextauth]/route.ts` creado | ❌ | Pendiente Agente Backend |
-| `src/middleware.ts` creado | ❌ | Pendiente Agente Backend |
-| Lógica de generación en `src/lib/diploma/` | ❌ | Directorio vacío — pendiente Agente PDF/Imagen |
+| `src/app/api/auth/[...nextauth]/route.ts` creado | ✅ | Implementado en Sprint 3A |
+| `src/middleware.ts` creado | ✅ | Implementado en Sprint 3A |
+| Lógica de generación en `src/lib/diploma/` | ✅ | engine.ts, composer.ts, pdf.ts, qr.ts, zipper.ts implementados en Sprint 3A |
 
 ---
 
@@ -555,3 +559,28 @@ Antes de un deploy productivo en entorno serverless, debe implementarse uno de e
 
 - Test HTTP real de `POST /api/generations/[id]/start` con sesión NextAuth, `validateOrigin` y `assertOwnership` (actualmente ningún script lo prueba — ver `scripts/qa-e2e.ts` TODO Sprint 3B)
 - Test real de `GET /v/[token]` con request HTTP contra el endpoint real
+
+---
+
+## 13. CI y toolchain (actualizado 2026-06-13)
+
+### Node.js
+
+- Versión recomendada: **20.17.0 LTS** (declarada en `.nvmrc` en la raíz)
+- Nota: el entorno de desarrollo local corre Node 24. El build local falla con `Cannot find module '../server/require-hook'` — es incompatibilidad de Node 24 con esta versión de Next.js 14, NO un error de TypeScript. El CI corre en Node 20 y no tiene este problema.
+
+### CI (GitHub Actions)
+
+Archivo: `.github/workflows/ci.yml`
+
+- Se dispara en push y PR a `main`
+- Job `typecheck`: `npx tsc --noEmit` en Node 20 con `prisma generate` previo
+- Job `lint`: `npm run lint` en Node 20
+
+Estado actual: **activo** — `ignoreBuildErrors: false` y `ignoreDuringBuilds: false` están en `next.config.mjs` desde 2026-06-13. El conteo de errores TS al momento de activar el CI fue 0.
+
+### TypeScript
+
+- `ignoreBuildErrors: false` en `next.config.mjs` — el build de producción falla si hay errores de TS
+- `ignoreDuringBuilds: false` — ESLint corre en build
+- Verificar antes de push: `npx tsc --noEmit`
