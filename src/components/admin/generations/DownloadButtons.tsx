@@ -47,7 +47,7 @@ function DownloadButton({
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
-      className={`inline-flex min-h-[40px] items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+      className={`inline-flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
         disabled || loading
           ? 'cursor-not-allowed bg-gray-100 text-gray-400'
           : 'bg-gray-900 text-white hover:bg-gray-700'

@@ -110,12 +110,12 @@ export function CsvUpload({ generationId, hasExistingStudents, disabled = false 
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-500">
-        Columnas requeridas: <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">student_name</code>,{' '}
+        Columnas requeridas: <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">nombre_completo</code>,{' '}
         <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">program</code>.{' '}
         Columnas opcionales: <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">issued_date</code>{' '}
         (ejemplo: <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">2026-06-10</code> o <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">10/06/2026</code>).{' '}
         <a
-          href="/plantilla-alumnos.csv"
+          href="/plantilla-participantes.csv"
           download
           className="text-gray-700 underline hover:text-gray-900"
         >

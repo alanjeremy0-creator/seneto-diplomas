@@ -137,7 +137,7 @@ function NumInput({ label, value, onChange }: { label: string; value: number; on
           const n = parseInt(e.target.value, 10)
           if (!isNaN(n)) onChange(n)
         }}
-        className="w-full rounded border border-gray-200 px-2 py-1 text-sm tabular-nums text-gray-900 focus:border-gray-400 focus:outline-none"
+        className="w-full rounded border border-gray-200 px-2 py-1 text-sm tabular-nums text-gray-900 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
       />
     </label>
   )
