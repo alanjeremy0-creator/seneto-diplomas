@@ -4,11 +4,12 @@ import { generateQrBuffer } from './qr'
 import { composeDiplomaPng, FieldZones as ComposerFieldZones } from './composer'
 import { embedPngInPdf } from './pdf'
 import { buildDiplomasZipLazy } from './zipper'
+import type { FieldZone, FieldZones } from '@/types'
 
-export function mapPrismaZonesToComposer(prismaZones: any): ComposerFieldZones | undefined {
+export function mapPrismaZonesToComposer(prismaZones: FieldZones | null | undefined): ComposerFieldZones | undefined {
   if (!prismaZones) return undefined
 
-  const mapText = (z: any) => (z ? { ...z, color: z.fontColor } : undefined)
+  const mapText = (z: FieldZone | undefined) => (z ? { ...z, color: z.fontColor } : undefined)
 
   return {
     studentName: mapText(prismaZones.name),
@@ -20,8 +21,8 @@ export function mapPrismaZonesToComposer(prismaZones: any): ComposerFieldZones |
   }
 }
 
-function sanitizeError(err: any): string {
-  const msg = err?.message || String(err)
+function sanitizeError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
   // Remove absolute paths
   const sanitized = msg.replace(/(?:\/|\\)[a-zA-Z0-9_.-]+(?:\/|\\)[a-zA-Z0-9_.-/]+/g, '[PATH]')
   return sanitized.substring(0, 500)
@@ -86,18 +87,19 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
     return
   }
 
-  const fieldZones = mapPrismaZonesToComposer(generation.template.field_zones)
-  
+  const fieldZones = mapPrismaZonesToComposer(generation.template.field_zones as FieldZones | null)
+
   // Attempt to load the template buffer. If this fails, fail the whole generation.
   let templateBuffer: Buffer
   try {
     templateBuffer = await storage.get(generation.template.file_path)
-  } catch (err: any) {
+  } catch (err: unknown) {
     await prisma.generation.update({
       where: { id: generationId },
       data: { status: 'failed' }
     })
-    throw new Error(`Failed to load template buffer: ${err.message}`)
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(`Failed to load template buffer: ${msg}`)
   }
 
   for (const cert of generation.certificates) {
@@ -155,7 +157,7 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
         data: { processed_count: { increment: 1 } }
       })
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       const safeErrorMsg = sanitizeError(err)
 
       await prisma.certificate.update({

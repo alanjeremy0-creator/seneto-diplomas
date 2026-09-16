@@ -4,6 +4,7 @@ interface Props {
   displayMode?: 'full' | 'partial'
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- displayMode reserved for DEC-002
 export function StudentName({ value, displayMode = 'full' }: Props) {
   if (!value) return <span className="text-gray-400">—</span>
   // displayMode 'partial' reserved for DEC-002 resolution

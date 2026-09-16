@@ -47,7 +47,7 @@ export function CreateGenerationModal({ isOpen, onClose }: Props) {
     setError('')
     setLoading(true)
 
-    let data: { generation?: { id: string } } = {}
+    let data: { generation?: { id: string }; error?: { message?: string } } = {}
     try {
       const res = await fetch('/api/generations', {
         method: 'POST',
@@ -57,7 +57,7 @@ export function CreateGenerationModal({ isOpen, onClose }: Props) {
       })
       data = await res.json()
       if (!res.ok) {
-        setError((data as any)?.error?.message ?? 'No se pudo crear la generación.')
+        setError(data?.error?.message ?? 'No se pudo crear la generación.')
         setLoading(false)
         return
       }

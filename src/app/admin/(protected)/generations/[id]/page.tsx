@@ -17,7 +17,7 @@ import type { FieldZones, GenerationStatus } from '@/types/index'
 
 export const dynamic = 'force-dynamic'
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata() {
   return { title: `Generación — Seneto` }
 }
 

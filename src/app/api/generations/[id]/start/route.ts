@@ -9,23 +9,6 @@ import { logAction } from '@/lib/api/audit'
 
 import { runGenerationEngine } from '@/lib/diploma/engine'
 
-// Safe response select — no internal storage paths exposed to clients
-const GENERATION_SELECT = {
-  id: true,
-  name: true,
-  status: true,
-  folio_prefix: true,
-  folio_year: true,
-  total_count: true,
-  processed_count: true,
-  error_count: true,
-  created_at: true,
-  updated_at: true,
-  template: {
-    select: { id: true, name: true },
-  },
-} as const
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }

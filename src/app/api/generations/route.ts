@@ -7,7 +7,7 @@ import { handleApiError, Errors } from '@/lib/api/errors'
 import { SAFE_GENERATION_SELECT } from '@/lib/api/selects'
 import type { GenerationCreateRequest } from '@/types/api'
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {

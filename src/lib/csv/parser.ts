@@ -8,13 +8,6 @@ function sanitizeTextField(value: string): string {
   return value.replace(/^[=+\-@]+/, '').trim()
 }
 
-const ALLOWED_COLUMNS = new Set([
-  'student_name',
-  'program',
-  'issued_date',
-  'folio_override',
-])
-
 export interface ParsedRow {
   row_number: number
   data: StudentCSVRow

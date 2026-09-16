@@ -95,7 +95,7 @@ export async function embedPngInPdf(
 
   // ── Resolve page dimensions ────────────────────────────────────────────────
 
-  let [pageW, pageH]: [number, number] =
+  const [pageW, pageH]: [number, number] =
     options.pageSizePts ?? PAGE_PRESETS[options.pagePreset ?? 'A4_LANDSCAPE']
 
   const padding = options.paddingPts ?? 0

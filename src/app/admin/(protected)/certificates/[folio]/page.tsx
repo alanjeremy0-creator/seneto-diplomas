@@ -53,6 +53,7 @@ export default async function CertificateDetailPage({ params }: PageProps) {
   }
 
   // Strip sensitive fields before passing to UI layer
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- generation_id excluded from `rest` on purpose
   const { photo_path, generation_id: _generationId, generation, ...rest } = raw
 
   const certificate: CertificateDetailItem = {
