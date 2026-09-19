@@ -4,9 +4,15 @@ export interface StorageAdapter {
   delete(path: string): Promise<void>
   exists(path: string): Promise<boolean>
   url(path: string): string
+  putStream(path: string, stream: Readable): Promise<void>
+  getStream(path: string): Readable
+  size(path: string): Promise<number>
 }
 
 import fs from 'fs/promises'
+import { createReadStream, createWriteStream } from 'fs'
+import { pipeline } from 'stream/promises'
+import type { Readable } from 'stream'
 import path from 'path'
 
 export class LocalStorage implements StorageAdapter {
@@ -33,6 +39,29 @@ export class LocalStorage implements StorageAdapter {
 
   async get(p: string): Promise<Buffer> {
     return fs.readFile(this.resolve(p))
+  }
+
+  // Escribe a un archivo temporal y lo renombra al terminar, para que un
+  // proceso que muere a mitad de la escritura no deje un archivo truncado.
+  async putStream(p: string, stream: Readable): Promise<void> {
+    const full = this.resolve(p)
+    const tmp = `${full}.tmp`
+    await fs.mkdir(path.dirname(full), { recursive: true })
+    try {
+      await pipeline(stream, createWriteStream(tmp))
+      await fs.rename(tmp, full)
+    } catch (err) {
+      await fs.unlink(tmp).catch(() => {})
+      throw err
+    }
+  }
+
+  getStream(p: string): Readable {
+    return createReadStream(this.resolve(p))
+  }
+
+  async size(p: string): Promise<number> {
+    return (await fs.stat(this.resolve(p))).size
   }
 
   async delete(p: string): Promise<void> {

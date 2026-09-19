@@ -1,3 +1,4 @@
+import { Readable } from 'stream'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -45,11 +46,11 @@ export async function GET(
       throw Errors.NOT_FOUND('ZIP de resultados')
     }
 
-    let buffer: Buffer
+    let zipSize: number
     try {
-      buffer = await storage.get(generation.zip_path)
+      zipSize = await storage.size(generation.zip_path)
     } catch (e) {
-      console.error('[download] storage.get failed:', e)
+      console.error('[download] storage.size failed:', e)
       throw Errors.NOT_FOUND('Archivo ZIP')
     }
 
@@ -75,12 +76,15 @@ export async function GET(
       },
     })
 
-    return new NextResponse(new Uint8Array(buffer), {
+    // Stream from disk so a large ZIP is never held in memory.
+    const body = Readable.toWeb(storage.getStream(generation.zip_path)) as ReadableStream
+
+    return new NextResponse(body, {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="diplomas-${safeName}.zip"`,
-        'Content-Length': String(buffer.length),
+        'Content-Length': String(zipSize),
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       },

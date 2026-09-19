@@ -90,6 +90,67 @@ function validateEntry(entry: ZipEntry, index: number): void {
   }
 }
 
+/**
+ * Validate every entry name up-front (without loading any buffer): traversal,
+ * absolute paths, separators, null bytes, allowlisted chars, .pdf only, no duplicates.
+ */
+function assertSafeEntryNames(entryNames: string[]): void {
+  entryNames.forEach((name, i) => {
+    const tag = `entry[${i}] "${name}"`
+    if (!name || typeof name !== 'string') throw new Error(`[zipper] ${tag}: name must be a non-empty string`)
+    if (name.includes('..')) throw new Error(`[zipper] ${tag}: name must not contain '..'`)
+    if (name.startsWith('/') || name.startsWith('\\')) throw new Error(`[zipper] ${tag}: absolute path not allowed`)
+    if (name.includes('/') || name.includes('\\')) throw new Error(`[zipper] ${tag}: path separators not allowed`)
+    if (name.includes('\x00')) throw new Error(`[zipper] ${tag}: null bytes not allowed`)
+    if (!SAFE_NAME_RE.test(name)) throw new Error(`[zipper] ${tag}: disallowed characters`)
+    if (!name.toLowerCase().endsWith('.pdf')) throw new Error(`[zipper] ${tag}: only .pdf allowed`)
+  })
+
+  const names = entryNames.map(n => n.toLowerCase())
+  const duplicates = names.filter((n, i) => names.indexOf(n) !== i)
+  if (duplicates.length > 0) {
+    throw new Error(`[zipper] duplicate entry name(s): ${Array.from(new Set(duplicates)).join(', ')}`)
+  }
+}
+
+/**
+ * Build a ZIP as a Readable stream, feeding one PDF at a time from a stream
+ * and waiting for each entry to be flushed before opening the next. Pipe the
+ * result straight to storage: memory stays flat regardless of batch size,
+ * unlike buildDiplomasZipLazy which accumulates the whole archive in RAM.
+ *
+ * PDFs embed PNGs (already compressed), so entries are stored, not deflated.
+ */
+export function createDiplomasZipStream(
+  entries: { name: string; getStream: () => Readable }[]
+): Readable {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error('[zipper] entries must be a non-empty array')
+  }
+  assertSafeEntryNames(entries.map(e => e.name))
+
+  const archive = archiver.create('zip', { store: true })
+
+  // Rejects if the archive errors or is closed early (e.g. the consumer failed),
+  // so the feeder below never waits forever on an 'entry' that won't come.
+  const aborted = new Promise<never>((_, reject) => {
+    archive.once('error', reject)
+    archive.once('close', () => reject(new Error('[zipper] archive closed before finalize')))
+  })
+  aborted.catch(() => {})
+
+  ;(async () => {
+    for (const entry of entries) {
+      const flushed = new Promise<void>(resolve => archive.once('entry', () => resolve()))
+      archive.append(entry.getStream(), { name: entry.name })
+      await Promise.race([flushed, aborted])
+    }
+    await archive.finalize()
+  })().catch(err => archive.destroy(err instanceof Error ? err : new Error(String(err))))
+
+  return archive
+}
+
 // ── Streaming export ──────────────────────────────────────────────────────────
 
 /**
@@ -105,24 +166,7 @@ export async function buildDiplomasZipLazy(
     throw new Error('[zipper] entries must be a non-empty array')
   }
 
-  // Validate names upfront — without loading buffers yet
-  entries.forEach((entry, i) => {
-    const { name } = entry
-    const tag = `entry[${i}] "${name}"`
-    if (!name || typeof name !== 'string') throw new Error(`[zipper] ${tag}: name must be a non-empty string`)
-    if (name.includes('..')) throw new Error(`[zipper] ${tag}: name must not contain '..'`)
-    if (name.startsWith('/') || name.startsWith('\\')) throw new Error(`[zipper] ${tag}: absolute path not allowed`)
-    if (name.includes('/') || name.includes('\\')) throw new Error(`[zipper] ${tag}: path separators not allowed`)
-    if (name.includes('\x00')) throw new Error(`[zipper] ${tag}: null bytes not allowed`)
-    if (!SAFE_NAME_RE.test(name)) throw new Error(`[zipper] ${tag}: disallowed characters`)
-    if (!name.toLowerCase().endsWith('.pdf')) throw new Error(`[zipper] ${tag}: only .pdf allowed`)
-  })
-
-  const names = entries.map(e => e.name.toLowerCase())
-  const duplicates = names.filter((n, i) => names.indexOf(n) !== i)
-  if (duplicates.length > 0) {
-    throw new Error(`[zipper] duplicate entry name(s): ${Array.from(new Set(duplicates)).join(', ')}`)
-  }
+  assertSafeEntryNames(entries.map(e => e.name))
 
   const level = options.compressionLevel ?? 6
   const archive = archiver.create('zip', { zlib: { level } })

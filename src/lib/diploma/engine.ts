@@ -3,7 +3,7 @@ import { storage } from '../storage/adapter'
 import { generateQrBuffer } from './qr'
 import { composeDiplomaPng, FieldZones as ComposerFieldZones } from './composer'
 import { embedPngInPdf } from './pdf'
-import { buildDiplomasZipLazy } from './zipper'
+import { createDiplomasZipStream } from './zipper'
 import type { FieldZone, FieldZones } from '@/types'
 
 export function mapPrismaZonesToComposer(prismaZones: FieldZones | null | undefined): ComposerFieldZones | undefined {
@@ -184,8 +184,8 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
     await new Promise<void>(r => setImmediate(r))
   }
 
-  // Finalization: leer PDFs de storage uno por uno para construir el ZIP.
-  // Esto evita acumular todos los buffers en RAM (O(1) en lugar de O(N)).
+  // Finalization: el ZIP se escribe a storage en streaming, un PDF a la vez,
+  // sin acumular el archivo completo en RAM (memoria constante, no O(N)).
   // También incluye diplomas de runs anteriores, soportando reintento parcial.
   const activeCerts = await prisma.certificate.findMany({
     where: {
@@ -198,14 +198,16 @@ export async function runGenerationEngine(generationId: string): Promise<void> {
   })
 
   if (activeCerts.length > 0) {
-    const zipBuffer = await buildDiplomasZipLazy(
-      activeCerts.map(c => ({
-        name: `${c.folio}.pdf`,
-        getBuffer: () => storage.get(c.diploma_pdf_path!)
-      }))
-    )
     const zipPath = `zips/${generationId}/diplomas.zip`
-    await storage.put(zipPath, zipBuffer)
+    await storage.putStream(
+      zipPath,
+      createDiplomasZipStream(
+        activeCerts.map(c => ({
+          name: `${c.folio}.pdf`,
+          getStream: () => storage.getStream(c.diploma_pdf_path!)
+        }))
+      )
+    )
 
     await prisma.generation.update({
       where: { id: generationId },
